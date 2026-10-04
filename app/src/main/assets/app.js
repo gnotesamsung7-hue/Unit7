@@ -75,7 +75,10 @@ const U7 = window.U7 = {
   onHear(kind, data){ heard(kind, data); },
   onTilt(p, r, z){ tiltIn(p, r, z); },
   onTiltMissing(){ $("#gText").textContent = "This phone has no tilt sensor."; },
-  onPause(){ if (!isEyes() && (S.driving || S.custom || S.legTilt)) emergencyStop(true); },
+  onPause(){
+    if (!isEyes() && (S.driving || S.custom || S.legTilt)) emergencyStop(true);
+    if (window.personaPause) personaPause();
+  },
   onLink(msg, from){ linkIn(msg, from); }
 };
 
@@ -83,6 +86,7 @@ const U7 = window.U7 = {
 let lastQuiet = 0;
 async function req(method, path){
   const url = "http://" + P.base + path;
+  if (window.countSteps && method === "POST" && path.startsWith("/api/v1/action?id=")) countSteps(+path.split("=")[1]);
   // Tell the Eyes phone the servos are about to make noise, so it doesn't mistake them for claps or waves.
   if (method === "POST" && path !== "/api/v1/stop" && P.role === "ctl" && S.eyes.linked && Date.now() - lastQuiet > 1000) {
     lastQuiet = Date.now(); linkSend({t:"quiet", ms:2500});
@@ -190,8 +194,11 @@ async function applyPose(target, tok, parallel){
 /* ---------- Unit 7's voice ---------- */
 function pick(key, vars){
   const list = LINES[key] || LINES.unknown;
-  const [mood, text] = list[Math.floor(Math.random() * list.length)];
-  return {mood, text: vars ? text.replace(/\{(\w+)\}/g, (m,k) => vars[k]) : text};
+  const [mood, raw] = list[Math.floor(Math.random() * list.length)];
+  let text = vars ? raw.replace(/\{(\w+)\}/g, (m,k) => k in vars ? vars[k] : m) : raw;
+  text = text.replace(/\{name\}/g, (typeof ST !== "undefined" && ST.name) || "operator");
+  if (window.flavour) text = flavour(text, key);
+  return {mood, text};
 }
 let sayChain = Promise.resolve(), sayTok = 0, spokenId = 0;
 const spoken = {};
@@ -200,9 +207,9 @@ function say(line){
   sayChain = sayChain.then(() => tok === sayTok ? doSay(line, tok) : null).catch(() => {});
   return sayChain;
 }
-function hush(){ sayTok++; if (P.role === "ctl" && S.eyes.linked) linkSend({t:"hush"}); if (HAS) Android.stopSpeaking(); Object.keys(spoken).forEach(k => U7.onSpoken(k)); }
-async function doSay({mood, text}, tok){
-  if (P.role === "ctl" && S.eyes.linked) return remoteSay({mood, text}, tok);
+function hush(){ sayTok++; $("#visor").dataset.talking = ""; if (P.role === "ctl" && S.eyes.linked) linkSend({t:"hush"}); if (HAS) Android.stopSpeaking(); Object.keys(spoken).forEach(k => U7.onSpoken(k)); }
+async function doSay({mood, text, vol}, tok){
+  if (P.role === "ctl" && S.eyes.linked && S.eyes.kind !== "head") return remoteSay({mood, text}, tok);
   setMood(mood);
   $("#says").innerHTML = text.replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]))
     .replace(/\[(.+?)\]/g, '<span class="tic">[$1]</span>');
@@ -212,10 +219,13 @@ async function doSay({mood, text}, tok){
     if (tok !== sayTok) return;
     const tic = part.match(/^\[(.+)\]$/);
     if (tic) { if (P.sfx) await sfx(tic[1]); continue; }
-    if (P.talk && HAS) await speakNative(part);
+    $("#visor").dataset.talking = "1";
+    if (P.talk && HAS) await speakNative(part, vol);
     else await sleep(Math.min(4000, 400 + part.length * 45));
+    $("#visor").dataset.talking = "";
   }
   S.speaking = false; S.spokeAt = Date.now();
+  $("#visor").dataset.talking = "";
   if (tok === sayTok && !S.listening) setMood(restMood());
 }
 // After a card, its mood lingers for a few seconds before Unit 7 relaxes.
@@ -228,12 +238,12 @@ function restMood(){
   }
   return S.driving || S.custom ? "busy" : "idle";
 }
-function speakNative(text){
+function speakNative(text, vol){
   const id = "s" + (++spokenId);
   return new Promise(res => {
     const t = setTimeout(() => { delete spoken[id]; res(); }, Math.max(3000, text.length * 120));
     spoken[id] = () => { clearTimeout(t); res(); };
-    Android.speak(id, text);
+    if (vol && vol < 1 && Android.speakVol) Android.speakVol(id, text, vol); else Android.speak(id, text);
   });
 }
 
@@ -272,6 +282,42 @@ function sfx(name){
     g.gain.setValueAtTime(0.001, t0); g.gain.exponentialRampToValueAtTime(0.6, t0 + 0.1); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.5);
     o.connect(f); f.connect(g); g.connect(out); o.start(t0); lfo.start(t0); o.stop(t0 + 0.52); lfo.stop(t0 + 0.52);
     dur = 0.52;
+  } else if (n.includes("hum")) {
+    [523, 587, 659, 587, 523].forEach((f, k) => {
+      const o = ac.createOscillator(), g = ac.createGain(), t = t0 + k * 0.18;
+      o.type = "triangle"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.03); g.gain.exponentialRampToValueAtTime(0.001, t + 0.17);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.18);
+    });
+    dur = 0.95;
+  } else if (n.includes("snore")) {
+    const o = ac.createOscillator(), g = ac.createGain(), f = ac.createBiquadFilter();
+    o.type = "sawtooth"; o.frequency.value = 70; f.type = "lowpass";
+    f.frequency.setValueAtTime(300, t0); f.frequency.linearRampToValueAtTime(900, t0 + 0.6); f.frequency.linearRampToValueAtTime(250, t0 + 1.2);
+    g.gain.setValueAtTime(0.001, t0); g.gain.exponentialRampToValueAtTime(0.5, t0 + 0.5); g.gain.exponentialRampToValueAtTime(0.001, t0 + 1.2);
+    o.connect(f); f.connect(g); g.connect(out); o.start(t0); o.stop(t0 + 1.22);
+    dur = 1.25;
+  } else if (n.includes("yawn")) {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = "sine"; o.frequency.setValueAtTime(520, t0); o.frequency.exponentialRampToValueAtTime(180, t0 + 0.9);
+    g.gain.setValueAtTime(0.001, t0); g.gain.exponentialRampToValueAtTime(0.5, t0 + 0.15); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.95);
+    o.connect(g); g.connect(out); o.start(t0); o.stop(t0 + 0.97);
+    dur = 1.0;
+  } else if (n.includes("wobble")) {
+    const o = ac.createOscillator(), lfo = ac.createOscillator(), lg = ac.createGain(), g = ac.createGain();
+    o.type = "sine"; o.frequency.value = 440; lfo.frequency.value = 9; lg.gain.value = 120;
+    lfo.connect(lg); lg.connect(o.frequency);
+    g.gain.setValueAtTime(0.5, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.8);
+    o.connect(g); g.connect(out); o.start(t0); lfo.start(t0); o.stop(t0 + 0.82); lfo.stop(t0 + 0.82);
+    dur = 0.85;
+  } else if (n.includes("giggle")) {
+    [0, 0.11, 0.22, 0.33].forEach((dt, k) => {
+      const o = ac.createOscillator(), g = ac.createGain(), t = t0 + dt;
+      o.type = "sine"; o.frequency.setValueAtTime(900 + k * 120, t); o.frequency.exponentialRampToValueAtTime(1500 + k * 120, t + 0.07);
+      g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.1);
+    });
+    dur = 0.5;
   } else if (n.includes("glug")) {
     [0, 0.18, 0.36].forEach(dt => {
       const o = ac.createOscillator(), g = ac.createGain();
@@ -297,6 +343,20 @@ function beep(kind){
   g.gain.setValueAtTime(0.18, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
   o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0 + 0.17);
 }
+
+/* ---------- Mouth: follows mood, talking and happiness ---------- */
+const MOUTH = {idle:"smile", happy:"grin", party:"grin", think:"hmm", listen:"o", surprised:"bigo", seen:"bigo",
+  worried:"wavy", dizzy:"wavy", sad:"frown", angry:"zig", sleep:"snore", busy:"flat"};
+function updateMouth(){
+  const v = $("#visor"), m = v.dataset.mood || "idle";
+  let shape = MOUTH[m] || "smile";
+  if (v.dataset.talking === "1" && m !== "sleep") shape = "talk";
+  else if (m === "idle" && v.dataset.happy === "high") shape = "bigsmile";
+  else if (m === "idle" && v.dataset.happy === "low") shape = "flat";
+  if (v.dataset.mouth !== shape) v.dataset.mouth = shape;
+}
+new MutationObserver(updateMouth).observe($("#visor"), {attributes: true, attributeFilter: ["data-mood", "data-talking", "data-happy"]});
+updateMouth();
 
 /* ---------- Eyes ---------- */
 function setMood(m){
@@ -325,6 +385,7 @@ function parse(raw){
   else if (has("once")) n = 1; else if (has("twice")) n = 2;
   if (n) n = clamp(n, 1, 10);
 
+  if (window.personaParse) { const pc = personaParse(t, has, raw); if (pc) return pc; }
   if (window.playParse) { const pc = playParse(t, has); if (pc) return pc; }
   if (has("stop","halt","freeze","hold","wait","enough","stay","quit","cancel")) return {cmd:"stop"};
   if (has("jump","hop","leap","bounce")) return {cmd:"hop"};
@@ -352,9 +413,11 @@ function parse(raw){
 }
 
 async function execute(c){
+  if (window.userActive) userActive();
   if (!c) { beep("down"); say(pick("unknown")); return; }
   const talkOnly = ["intro","chief","thanks","praise","battery"];
   if (c.cmd === "stop") { hush(); emergencyStop(true); say(pick("stop")); return; }
+  if (window.personaExecute && personaExecute(c)) return;
   if (window.playExecute && playExecute(c)) return;
   if (talkOnly.includes(c.cmd)) {
     if (c.cmd === "battery") {
@@ -396,6 +459,7 @@ function startListen(){
   if (S.listening) { Android.stopListening(); return; }
   S.wakeListening = false;
   hush();
+  if (isEyes() && window.stopEars) stopEars();
   S.listening = true; micUI(); setMood("listen"); beep("up");
   $("#heard").textContent = "Listening…";
   Android.listen(!!P.offline);
@@ -410,8 +474,11 @@ function heard(kind, data){
   if (kind === "partial") { if (data && data[0]) $("#heard").textContent = "You: " + data[0]; return; }
   if (kind === "end") return;
   S.listening = false; micUI(); setMood("think");
+  if (isEyes() && window.startEars) setTimeout(startEars, 600);
   if (kind === "final") {
     const list = (data || []).filter(Boolean);
+    // Eyes phone with a controller nearby: let the controller act on it (it drives the legs).
+    if (isEyes() && !S.ctlAsleep && S.ctlIp && list.length) { linkSend({t:"heard", list, to: S.ctlIp}); setMood("idle"); return; }
     $("#heard").textContent = list.length ? "You: " + list[0] : "";
     let c = null;
     for (const alt of list) { c = parse(alt); if (c) break; }
@@ -603,6 +670,8 @@ function legTiltTick(){
 async function hop(){
   if (Date.now() - S.lastHop < 5000) { say(pick("hopCooldown")); return; }
   S.lastHop = Date.now();
+  if (typeof ST !== "undefined" && ST.brave < 30) { say(pick("hopNervous")); await sleep(1500); }
+  if (window.grow) grow("brave", 1);
   const tok = ++S.token; S.custom = "Hopping"; renderStatus();
   await makeRoom(); if (tok !== S.token) return;
   say(pick("hopStart"));
@@ -703,11 +772,13 @@ async function remoteSay({mood, text}, tok){
   $("#says").innerHTML = text.replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]))
     .replace(/\[(.+?)\]/g, '<span class="tic">[$1]</span>');
   const id = MY_ID + "-" + (++remoteId);
-  linkSend({t:"say", id, mood, text, talk:P.talk, sfx:P.sfx});
+  linkSend({t:"say", id, mood, text, talk:P.talk, sfx:P.sfx, vol: S.whisper ? 0.35 : 1});
+  $("#visor").dataset.talking = "1";
   await new Promise(res => {
     const t = setTimeout(() => { delete saidWait[id]; res(); }, Math.max(3500, text.length * 110));
     saidWait[id] = () => { clearTimeout(t); res(); };
   });
+  $("#visor").dataset.talking = "";
   if (tok === sayTok && !S.listening) setMood(restMood());
 }
 function linkIn(raw, from){
@@ -718,8 +789,14 @@ function linkIn(raw, from){
     if (m.t === "hb") {
       const wasLinked = S.eyes.linked;
       S.eyes.ip = from; S.eyes.bat = m.bat; S.eyes.last = Date.now(); S.eyes.linked = true;
+      S.eyes.kind = m.kind === "head" ? "head" : "phone";
       renderEyesLink();
-      if (!wasLinked) { linkSend({t:"color", c: P.color}); say(pick("eyesLinked")); }
+      if (!wasLinked) {
+        linkSend({t:"color", c: P.color});
+        if (window.sendHappy) sendHappy();
+        if (window.syncToEyes) setTimeout(syncToEyes, 1500);
+        say(pick(S.eyes.kind === "head" ? "headLinked" : "eyesLinked"));
+      }
       if (m.bat != null && m.bat < 20 && !S.eyes.warned) { S.eyes.warned = true; say(pick("eyesBatteryLow", {n: m.bat})); }
       if (m.bat != null && m.bat > 30) S.eyes.warned = false;
     } else if (m.t === "said" && saidWait[m.id]) { const f = saidWait[m.id]; delete saidWait[m.id]; f(); }
@@ -729,13 +806,19 @@ function linkIn(raw, from){
   }
   // Eyes phone
   if (m.role !== "ctl") return;
-  S.ctlLast = Date.now(); S.ctlIp = from;
+  const wasSolo = S.ctlAsleep;
+  S.ctlLast = Date.now(); S.ctlIp = from; S.ctlAsleep = false;
   wake();
+  if (wasSolo) {
+    $("#visor").dataset.mood = "happy";
+    setTimeout(() => { if ($("#visor").dataset.mood === "happy") $("#visor").dataset.mood = "idle"; }, 1500);
+    if (window.personaRelink) personaRelink(from);
+  }
   if (m.t === "say") {
     const talk = P.talk, fx = P.sfx;
     P.talk = m.talk !== false; P.sfx = m.sfx !== false;
     const tok = sayTok;
-    sayChain = sayChain.then(() => tok === sayTok ? doSay({mood: m.mood, text: m.text}, tok) : null).catch(() => {})
+    sayChain = sayChain.then(() => tok === sayTok ? doSay({mood: m.mood, text: m.text, vol: m.vol}, tok) : null).catch(() => {})
       .then(() => { P.talk = talk; P.sfx = fx; linkSend({t:"said", id: m.id, to: from}); });
   } else if (m.t === "mood") $("#visor").dataset.mood = m.m;
   else if (m.t === "look") $("#visor").dataset.look = m.d;
@@ -748,7 +831,8 @@ function renderEyesLink(){
   $("#eyesTag").classList.toggle("on", on);
   $("#eyesTag").setAttribute("aria-label", on ? "Eyes phone linked" : "Eyes phone not linked");
   $("#eyesStatus").textContent = on
-    ? "Linked to the Eyes phone at " + S.eyes.ip + (S.eyes.bat != null ? " (battery " + S.eyes.bat + "%)." : ".")
+    ? (S.eyes.kind === "head" ? "Linked to Unit 7’s head (camera board) at " + S.eyes.ip + "."
+       : "Linked to the Eyes phone at " + S.eyes.ip + (S.eyes.bat != null ? " (battery " + S.eyes.bat + "%)." : "."))
     : "No Eyes phone found yet. Open Unit 7 on the robot’s phone, choose Eyes, and join the same Wi-Fi.";
 }
 
@@ -758,8 +842,6 @@ function wake(){
   if (!isEyes()) return;
   if (dimmed && HAS) Android.brightness(-1);
   dimmed = false;
-  if ($("#visor").dataset.mood === "sleep" && S.ctlAsleep) { $("#visor").dataset.mood = "happy"; setTimeout(() => { if ($("#visor").dataset.mood === "happy") $("#visor").dataset.mood = "idle"; }, 1200); }
-  S.ctlAsleep = false;
   clearTimeout(dimTimer);
   dimTimer = setTimeout(() => { dimmed = true; if (HAS) Android.brightness(0.15); }, 60000);
 }
@@ -767,17 +849,29 @@ function startEyes(){
   document.body.classList.add("eyes-mode");
   if (HAS) { Android.eyesMode(true); Android.linkStart(); }
   $("#visor").dataset.mood = "sleep"; S.ctlAsleep = true;
+  booted = true;
+  // No controller within a few seconds: Unit 7 runs on his own.
+  setTimeout(() => { if (S.ctlAsleep) soloStart(true); }, 8000);
   startScanner();
   if (window.startEars) startEars();
+  if (window.startBody) startBody();
   setTimeout(() => $("#eyesHint").classList.add("gone"), 5000);
   setInterval(() => {
     linkSend({t:"hb", bat: HAS ? Android.battery() : null});
-    if (Date.now() - S.ctlLast > 10000 && !S.ctlAsleep) { S.ctlAsleep = true; $("#visor").dataset.mood = "sleep"; }
+    if (Date.now() - S.ctlLast > 10000 && !S.ctlAsleep) { S.ctlAsleep = true; soloStart(false); }
   }, 2000);
-  // Hold anywhere for 3 seconds to leave.
-  let holdT = null;
-  document.addEventListener("pointerdown", () => { holdT = setTimeout(leaveEyes, 3000); });
-  ["pointerup","pointercancel"].forEach(ev => document.addEventListener(ev, () => clearTimeout(holdT)));
+  // Tap the face to talk to him. Hold anywhere for 3 seconds to leave.
+  let holdT = null, downAt = 0;
+  document.addEventListener("pointerdown", () => { downAt = Date.now(); holdT = setTimeout(leaveEyes, 3000); });
+  document.addEventListener("pointerup", () => { clearTimeout(holdT); if (Date.now() - downAt < 450) startListen(); });
+  document.addEventListener("pointercancel", () => clearTimeout(holdT));
+}
+// The Eyes phone on its own: wake up and be Unit 7 without a controller.
+function soloStart(first){
+  if (!isEyes()) return;
+  $("#visor").dataset.mood = "idle";
+  if (window.LIFE) { LIFE.dozing = false; LIFE.lastUser = Date.now(); }
+  say(pick(first ? "soloStart" : "soloLost"));
 }
 function leaveEyes(){
   P.role = null; savePrefs();
@@ -789,7 +883,7 @@ function startController(){
   setInterval(() => {
     linkSend({t:"hb"});
     if (S.eyes.linked && Date.now() - S.eyes.last > 7000) {
-      S.eyes.linked = false; renderEyesLink(); toast("Lost the Eyes phone. Unit 7 will speak from this phone.");
+      S.eyes.linked = false; renderEyesLink(); toast(S.eyes.kind === "head" ? "Lost Unit 7’s head." : "Lost the Eyes phone. Unit 7 will speak from this phone.");
     }
   }, 2000);
   renderEyesLink();
@@ -857,7 +951,8 @@ const CARDS = {
   HELLO:   {mood:"happy",   line:"cardHello",   ms:3000},
   JUMP:    {jump:true},
   HAPPY:   {mood:"happy",   line:"cardHappy",   ms:6000, move: () => wiggle([ACT.stepleft, ACT.stepright])},
-  SCARED:  {mood:"worried", line:"cardScared",  ms:6000, move: () => walkSteps(ACT.backward, 2, "Backing away")},
+  SCARED:  {mood:"worried", line: () => typeof ST !== "undefined" && ST.brave > 70 ? "cardScaredBrave" : "cardScared", ms:6000,
+            move: () => typeof ST !== "undefined" && ST.brave > 70 ? runAction(ACT.fight) : walkSteps(ACT.backward, 2, "Backing away")},
   FIERCE:  {mood:"angry",   line:"cardFierce",  ms:6000, move: () => runAction(ACT.fight)},
   SAD:     {mood:"sad",     line:"cardSad",     ms:8000, move: () => runAction(ACT.sit)},
   CURIOUS: {mood:"think",   line:"cardCurious", ms:6000, move: () => wiggle([ACT.turnleft, ACT.turnright])},
@@ -879,7 +974,8 @@ async function doCard(code){
   if (card.jump) { if (S.online) hop(); else say(pick("hopStart")); return; }
   hush();
   S.hold = {m: card.mood, until: Date.now() + card.ms};
-  say(pick(card.line));
+  say(pick(typeof card.line === "function" ? card.line() : card.line));
+  if (window.grow) grow("curious", 1);
   if (P.role === "ctl" && S.online && card.move) card.move();
 }
 // Eyes phone: watch through the front camera for cards.
@@ -914,7 +1010,7 @@ async function startScanner(){
 }
 function cardSeen(code){
   const now = Date.now();
-  const game = window.SENSE && SENSE.game;
+  const game = typeof SENSE !== "undefined" && SENSE.game;
   if (code === scan.last && now - scan.lastAt < (game ? 2500 : 6000)) return;
   if (now - scan.lastAt < (game ? 1000 : 2000)) return;
   scan.last = code; scan.lastAt = now;

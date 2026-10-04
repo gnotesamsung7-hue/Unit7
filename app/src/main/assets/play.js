@@ -26,6 +26,7 @@ function award(n){
   const before = rankIdx();
   ST.points += n; ST.happy = Math.min(100, ST.happy + 6 * n); touch();
   renderMeter(); sendHappy();
+  if (window.personaPoints) personaPoints(n);
   const after = rankIdx();
   if (after > before) {
     S.hold = {m: "party", until: Date.now() + 7000};
@@ -69,8 +70,10 @@ function onClap(n){
 /* ---------- Follow the light ---------- */
 const FOLLOW = {on: false, light: null, seenAt: 0, tok: 0};
 async function follow(mode){
+  if (isEyes()) { say(pick("needLegs")); return "nolegs"; }
   if (!S.eyes.linked) { say(pick("needEyes")); return "noeyes"; }
   if (!S.online) { await refreshState(); if (!S.online) { say(pick("noLink")); return "nolink"; } }
+  if (window.braveCheck) await braveCheck(mode);
   const tok = ++S.token;
   FOLLOW.on = true; FOLLOW.tok = tok; FOLLOW.light = null; FOLLOW.seenAt = Date.now();
   S.custom = mode === "seek" ? "Searching" : "Following the light"; renderStatus();
@@ -132,11 +135,13 @@ function tone(c){
 }
 
 function startGame(kind){
-  if (!S.eyes.linked) { say(pick("needEyes")); return; }
+  if (isEyes() && kind === "seek") { say(pick("needLegs")); return; }
+  if (!S.eyes.linked && !isEyes()) { say(pick("needEyes")); return; }
   if (GAME.on) endGame(true);
   hush();
   Object.assign(GAME, {on: true, kind, score: 0, tok: GAME.tok + 1, want: null, found: new Set(), t0: Date.now()});
   linkSend({t: "game", on: true});
+  if (isEyes()) SENSE.game = true;
   touch(); renderGame();
   const g = GAME.tok;
   ({quiz: runQuiz, copy: runCopy, seek: runSeek, hunt: runHunt})[kind](g);
@@ -146,6 +151,7 @@ function endGame(silent){
   GAME.on = false; GAME.want = null;
   if (FOLLOW.on) FOLLOW.on = false;
   linkSend({t: "game", on: false});
+  if (isEyes()) SENSE.game = false;
   flash(null, false);
   renderGame();
   if (!silent) say(pick("gameEnd"));
@@ -154,6 +160,7 @@ function finishGame(score, good, pts){
   const g = GAME.tok;
   if (!alive(g)) return;
   const won = score >= good;
+  if (window.personaGame) personaGame(GAME.kind, score, won);
   say(pick(won ? "gameWin" : "gameTry", {n: score, game: GAME_NAMES[GAME.kind]}));
   endGame(true);
   if (pts > 0) award(pts);
@@ -363,6 +370,9 @@ function wakeHeard(kind, data){
     return;
   }
   const list = (data || []).map(x => String(x).toLowerCase());
+  if (window.personaAsking && personaAsking() && list.length) {
+    $("#heard").textContent = "You: " + list[0]; execute(parse(list[0])); wakeListen(400); return;
+  }
   for (const alt of list) {
     if (GREET_RE.test(alt)) { wakeArmed = 0; $("#heard").textContent = "You: " + alt; execute({cmd: "wave"}); break; }
     if (Date.now() < wakeArmed) {

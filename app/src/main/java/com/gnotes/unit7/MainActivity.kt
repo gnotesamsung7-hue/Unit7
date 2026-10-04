@@ -16,6 +16,7 @@ import android.net.wifi.WifiManager
 import android.content.pm.ActivityInfo
 import android.view.View
 import android.os.BatteryManager
+import android.util.Base64
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -161,6 +162,25 @@ class MainActivity : Activity(), SensorEventListener {
         js("U7.onResponse(${q(id)},$status,${q(body)})")
     }
 
+    /** Fetch a camera snapshot from Unit 7's head and hand it to the page as a data URL. */
+    private fun doFetchImage(id: String, url: String) {
+        var data = ""
+        try {
+            val u = URL(url)
+            val conn = (wifiNetwork()?.openConnection(u) ?: u.openConnection()) as HttpURLConnection
+            conn.connectTimeout = 1500
+            conn.readTimeout = 3000
+            if (conn.responseCode == 200) {
+                val bytes = conn.inputStream.use { it.readBytes() }
+                data = "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
+            }
+            conn.disconnect()
+        } catch (e: Exception) {
+            data = ""
+        }
+        js("U7.onImage(${q(id)},${q(data)})")
+    }
+
     private fun startListening(preferOffline: Boolean) {
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 7)
@@ -201,6 +221,8 @@ class MainActivity : Activity(), SensorEventListener {
         r.startListening(intent)
     }
 
+    private var tiltSensor: Sensor? = null
+
     private fun setTilt(on: Boolean) {
         if (on == tiltOn) return
         tiltOn = on
@@ -212,9 +234,52 @@ class MainActivity : Activity(), SensorEventListener {
                 tiltOn = false
                 return
             }
+            tiltSensor = s
             sensors.registerListener(this, s, SensorManager.SENSOR_DELAY_GAME)
         } else {
-            sensors.unregisterListener(this)
+            tiltSensor?.let { sensors.unregisterListener(this, it) }
+        }
+    }
+
+    /* Body sensors for the Eyes phone: being picked up, shaken, tipped, covered, in the dark. */
+    private var bodyOn = false
+    private var lastAccelPost = 0L
+    private var lastLightPost = 0L
+    private var lastProxNear: Boolean? = null
+
+    private fun setBody(on: Boolean) {
+        if (on == bodyOn) return
+        bodyOn = on
+        val list = listOf(Sensor.TYPE_ACCELEROMETER, Sensor.TYPE_PROXIMITY, Sensor.TYPE_LIGHT)
+            .mapNotNull { sensors.getDefaultSensor(it) }
+        for (s in list) {
+            if (on) sensors.registerListener(this, s,
+                if (s.type == Sensor.TYPE_ACCELEROMETER) SensorManager.SENSOR_DELAY_GAME else SensorManager.SENSOR_DELAY_NORMAL)
+            else sensors.unregisterListener(this, s)
+        }
+        if (!on) lastProxNear = null
+    }
+
+    private fun onBodySensor(event: SensorEvent) {
+        val now = System.currentTimeMillis()
+        when (event.sensor.type) {
+            Sensor.TYPE_ACCELEROMETER -> {
+                if (now - lastAccelPost < 40) return
+                lastAccelPost = now
+                js("U7.onAccel && U7.onAccel(%.2f,%.2f,%.2f)".format(Locale.US, event.values[0], event.values[1], event.values[2]))
+            }
+            Sensor.TYPE_PROXIMITY -> {
+                val near = event.values[0] < minOf(event.sensor.maximumRange, 5f)
+                if (near != lastProxNear) {
+                    lastProxNear = near
+                    js("U7.onProx && U7.onProx($near)")
+                }
+            }
+            Sensor.TYPE_LIGHT -> {
+                if (now - lastLightPost < 1000) return
+                lastLightPost = now
+                js("U7.onLight && U7.onLight(%.1f)".format(Locale.US, event.values[0]))
+            }
         }
     }
 
@@ -315,6 +380,11 @@ class MainActivity : Activity(), SensorEventListener {
     }
 
     override fun onSensorChanged(event: SensorEvent) {
+        val type = event.sensor.type
+        if (type == Sensor.TYPE_ACCELEROMETER || type == Sensor.TYPE_PROXIMITY || type == Sensor.TYPE_LIGHT) {
+            onBodySensor(event)
+            return
+        }
         val now = System.currentTimeMillis()
         if (now - lastTiltPost < 40) return
         lastTiltPost = now
@@ -334,17 +404,23 @@ class MainActivity : Activity(), SensorEventListener {
         setTilt(false)
         tiltOn = false
         if (wasTilt) pendingTilt = true
+        if (bodyOn) { setBody(false); pendingBody = true }
         recognizer?.cancel()
         js("U7.onPause()")
     }
 
     private var pendingTilt = false
+    private var pendingBody = false
 
     override fun onResume() {
         super.onResume()
         if (pendingTilt) {
             pendingTilt = false
             setTilt(true)
+        }
+        if (pendingBody) {
+            pendingBody = false
+            setBody(true)
         }
         js("U7.onResume && U7.onResume()")
     }
@@ -367,12 +443,37 @@ class MainActivity : Activity(), SensorEventListener {
         }
 
         @JavascriptInterface
+        fun fetchImage(id: String, url: String) {
+            io.execute { doFetchImage(id, url) }
+        }
+
+        @JavascriptInterface
         fun speak(id: String, text: String) {
             if (!ttsReady) {
                 js("U7.onSpoken(${q(id)})")
                 return
             }
             tts?.speak(text, TextToSpeech.QUEUE_ADD, null, id)
+        }
+
+        @JavascriptInterface
+        fun speakVol(id: String, text: String, volume: Float) {
+            if (!ttsReady) {
+                js("U7.onSpoken(${q(id)})")
+                return
+            }
+            val params = Bundle()
+            params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume.coerceIn(0.05f, 1f))
+            tts?.speak(text, TextToSpeech.QUEUE_ADD, params, id)
+        }
+
+        @JavascriptInterface
+        fun body(on: Boolean) { main.post { setBody(on) } }
+
+        @JavascriptInterface
+        fun charging(): Boolean {
+            val bm = getSystemService(BATTERY_SERVICE) as BatteryManager
+            return bm.isCharging
         }
 
         @JavascriptInterface

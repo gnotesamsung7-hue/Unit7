@@ -105,6 +105,7 @@ window.LINES = {
   batteryLow: [["worried", "[Joint creak] Phone power at {n} percent. Requesting a recharge and maybe a small rest."]],
   noLink: [["worried", "I can't reach my legs. Join the robot's Wi-Fi first."]],
   count: [["busy", "{n}."]],
+  headLinked: [["happy", "[Gyro whir] Head unit online. Four lenses and one camera, all pointing forward."]],
   eyesLinked: [
     ["happy", "[Gyro whir] Eyes mounted. I can see where I'm going now."],
     ["happy", "Optical unit attached. Four lenses, all pointing forward. Excellent."]

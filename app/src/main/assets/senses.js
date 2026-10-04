@@ -72,8 +72,17 @@ function sendUp(o){
 }
 
 /* ---------- Claps ---------- */
+const EARS = {stream: null, timer: null, starting: false};
+function stopEars(){
+  clearInterval(EARS.timer); EARS.timer = null;
+  if (EARS.stream) { EARS.stream.getTracks().forEach(t => t.stop()); EARS.stream = null; }
+}
 async function startEars(){
-  if (!navigator.mediaDevices) return;
+  if (!navigator.mediaDevices || EARS.stream || EARS.starting || S.listening) return;
+  EARS.starting = true;
+  try { await startEarsInner(); } finally { EARS.starting = false; }
+}
+async function startEarsInner(){
   if (HAS && !Android.hasMic()) {
     const ok = await new Promise(res => { U7.onMicPermission = res; Android.askMic(); });
     if (!ok) return;
@@ -83,11 +92,13 @@ async function startEars(){
     stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: false, noiseSuppression: false, autoGainControl: false}, video: false});
   } catch(e) { console.log("mic error", e); return; }
   const ac = audio(); if (!ac) return;
+  if (S.listening) { stream.getTracks().forEach(t => t.stop()); return; }
+  EARS.stream = stream;
   const src = ac.createMediaStreamSource(stream), an = ac.createAnalyser();
   an.fftSize = 512; src.connect(an);
   const buf = new Float32Array(an.fftSize);
   const ear = {avg: 0.01, claps: [], peakAt: 0, inPeak: false};
-  setInterval(() => {
+  EARS.timer = setInterval(() => {
     an.getFloatTimeDomainData(buf);
     let pk = 0, s = 0;
     for (let i = 0; i < buf.length; i++) { const v = buf[i]; s += v * v; if (Math.abs(v) > pk) pk = Math.abs(v); }
@@ -126,4 +137,100 @@ function senseLink(m){
   else if (m.t === "game") SENSE.game = !!m.on;
   else if (m.t === "quiet") SENSE.quietUntil = Date.now() + (m.ms || 2500);
   else if (m.t === "happy") $("#visor").dataset.happy = m.h > 70 ? "high" : m.h < 30 ? "low" : "";
+}
+
+/* ---------- Body: picked up, shaken, tipped over, covered, dark, charging ---------- */
+const BODY = {lp: [0, 0, 9.81], g0: null, hist: [], steadySince: 0, tipStart: 0, tipped: false, lifted: false,
+  liftSince: 0, cool: {}, proxAt: 0, covered: false, darkSince: 0, brightSince: 0, dark: false, charging: null};
+
+function bodyEvent(e){
+  const now = Date.now();
+  if (now - (BODY.cool[e] || 0) < 6000) return;
+  BODY.cool[e] = now;
+  wake();
+  if (!sendUp({t: "body", e})) {
+    if (window.bodyReact) { bodyReact(e); return; }
+    const local = {tipped: "bodyTipped", upright: "bodyUpright", lifted: "bodyLifted", putdown: "bodyPutDown", shaken: "bodyShaken",
+      covered: "bodyCovered", peekaboo: "bodyPeekaboo", uncovered: "bodyUncovered", dark: "bodyDark", lights: "bodyLights",
+      charging: "bodyCharging", unplugged: "bodyUnplugged"}[e];
+    if (local && LINES[local]) say(pick(local));
+  }
+}
+
+const angleBetween = (a, b) => {
+  const d = a[0] * b[0] + a[1] * b[1] + a[2] * b[2], m = Math.hypot(...a) * Math.hypot(...b);
+  return m ? Math.acos(Math.max(-1, Math.min(1, d / m))) * 57.3 : 0;
+};
+
+// One accelerometer sample (m/s², gravity included). Pure enough to test.
+function bodyAccel(x, y, z, now){
+  const lp = BODY.lp, v = [x, y, z];
+  for (let i = 0; i < 3; i++) lp[i] = lp[i] * 0.9 + v[i] * 0.1;
+  const dev = Math.abs(Math.hypot(x, y, z) - 9.81);
+  const H = BODY.hist;
+  H.push({t: now, dev});
+  while (H.length && now - H[0].t > 1500) H.shift();
+  const steady = H.length > 10 && H.every(h => h.dev < 0.6);
+  if (steady) { if (!BODY.steadySince) BODY.steadySince = now; } else BODY.steadySince = 0;
+  // Learn which way is "upright" whenever he has been resting calmly for a few seconds.
+  const ang = BODY.g0 ? angleBetween(lp, BODY.g0) : 0;
+  if (steady && now - BODY.steadySince > 3000 && !BODY.tipped && !BODY.lifted) {
+    if (!BODY.g0) BODY.g0 = lp.slice();
+    else if (ang < 15) for (let i = 0; i < 3; i++) BODY.g0[i] = BODY.g0[i] * 0.995 + lp[i] * 0.005;   // drift slowly
+  }
+  // Lying still in a new position for a long time: accept it as the new "upright" (phone re-mounted).
+  if (BODY.tipped && steady && now - BODY.steadySince > 20000) { BODY.tipped = false; BODY.g0 = lp.slice(); }
+
+  // Tipped over: gravity points a very different way for over a second.
+  if (BODY.g0 && !BODY.tipped && ang > 55) {
+    if (!BODY.tipStart) BODY.tipStart = now;
+    if (now - BODY.tipStart > 1000) { BODY.tipped = true; BODY.lifted = false; bodyEvent("tipped"); return "tipped"; }
+  } else BODY.tipStart = 0;
+  if (BODY.tipped && ang < 20 && steady) { BODY.tipped = false; bodyEvent("upright"); return "upright"; }
+
+  const moving = now < SENSE.quietUntil;   // his own walking shakes the phone: ignore that
+  if (moving) return null;
+  const big = H.filter(h => h.dev > 4).length;
+  if (big >= 6) { H.length = 0; BODY.liftCand = 0; bodyEvent("shaken"); return "shaken"; }
+  // Picked up: a clear bump, then uneven motion that isn't shaking, for most of a second.
+  const busy = H.filter(h => h.dev > 0.8).length / Math.max(1, H.length);
+  const liftish = !BODY.lifted && !BODY.tipped && H.length > 15 && busy > 0.4 && big < 3;
+  if (liftish && !BODY.liftCand && H.some(h => h.dev > 2.2)) BODY.liftCand = now;
+  if (!liftish) BODY.liftCand = 0;
+  if (BODY.liftCand && now - BODY.liftCand > 700) {
+    BODY.liftCand = 0; BODY.lifted = true; BODY.liftSince = now; bodyEvent("lifted"); return "lifted";
+  }
+  if (BODY.lifted && steady && now - BODY.steadySince > 1500 && now - BODY.liftSince > 2000) {
+    BODY.lifted = false; bodyEvent("putdown"); return "putdown";
+  }
+  return null;
+}
+
+U7.onAccel = (x, y, z) => { if (isEyes()) bodyAccel(x, y, z, Date.now()); };
+U7.onProx = near => {
+  if (!isEyes()) return;
+  const now = Date.now();
+  if (near) {
+    BODY.proxAt = now;
+    setTimeout(() => { if (BODY.proxAt === now) { BODY.covered = true; $("#visor").dataset.mood = "sleep"; bodyEvent("covered"); } }, 1200);
+  } else {
+    const held = now - BODY.proxAt;
+    BODY.proxAt = 0;
+    if (BODY.covered) { BODY.covered = false; $("#visor").dataset.mood = "surprised"; bodyEvent(held < 9000 ? "peekaboo" : "uncovered"); }
+  }
+};
+U7.onLight = lux => {
+  if (!isEyes()) return;
+  const now = Date.now();
+  if (lux < 3) { BODY.brightSince = 0; if (!BODY.darkSince) BODY.darkSince = now; if (!BODY.dark && now - BODY.darkSince > 8000) { BODY.dark = true; bodyEvent("dark"); } }
+  else if (lux > 15) { BODY.darkSince = 0; if (!BODY.brightSince) BODY.brightSince = now; if (BODY.dark && now - BODY.brightSince > 3000) { BODY.dark = false; bodyEvent("lights"); } }
+};
+function startBody(){
+  if (!HAS) return;
+  Android.body(true);
+  setInterval(() => {
+    let c; try { c = Android.charging(); } catch(e) { return; }
+    if (BODY.charging !== null && c !== BODY.charging) bodyEvent(c ? "charging" : "unplugged");
+    BODY.charging = c;
+  }, 10000);
 }

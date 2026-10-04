@@ -19,5 +19,9 @@ for 3 seconds to leave Eyes mode.
 **Also:** wave and clap reactions, follow-the-light, four games (Colour Quiz, Copy Me,
 Hide and Seek, Treasure Hunt), encourage points with ranks, and hands-free "Hey Unit 7".
 
+**Personality:** idle life and daily rhythm, reactions to being picked up, shaken, tipped,
+covered or left in the dark, memory of your name and favourites, the story of the missing
+Units 1-6 with a maintenance log, jokes and conversation, and bravery/curiosity that grow.
+
 Connect both phones to the robot's Wi-Fi ("Robot - ...", password 12345678).
 The APK is built by GitHub Actions: Actions tab → latest run → Unit7-apk.

@@ -212,3 +212,42 @@ body.eyes-mode .eyes-hint.gone{opacity:0}
 .gamebar button{min-height:44px;padding:0 16px;border-radius:12px;background:var(--plate);border:1px solid var(--line);font-weight:600}
 .visor[data-happy=high] .iris{filter:drop-shadow(0 0 11px var(--glow2))}
 .visor[data-happy=low][data-mood=idle] .lid{transform:scaleY(.8) translateY(6%)}
+
+/* ---------- personality ---------- */
+.traits{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.traits span{color:var(--muted);font-size:12.5px}
+.bar.thin{height:6px;margin:5px 0 0}
+#braveBar{background:linear-gradient(90deg,#8a3b1f,#e0442f);width:20%}
+#curiousBar{background:linear-gradient(90deg,#1f5f8a,#2fa8ff);width:30%}
+.linkbtn{margin-top:12px;min-height:44px;padding:0 14px;border-radius:12px;background:var(--steel);border:1px solid var(--line);font-weight:600;width:100%}
+.log-in{max-height:100%;overflow-y:auto;padding-bottom:20px}
+.log-head{display:flex;justify-content:space-between;align-items:center}
+.log-head h1{font-size:26px}
+.entry{background:var(--plate);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:8px 0}
+.entry strong{font:700 16px var(--cond);color:var(--amber)}
+.entry p{margin:4px 0 0;font-size:14.5px}
+.entry.locked{opacity:.55}
+.entry.locked strong{color:var(--muted)}
+.role.log{align-items:stretch}
+#logScreen{align-items:flex-start;overflow-y:auto}
+.visor[data-mood=dizzy] .look{animation:dizzy .7s linear infinite}
+@keyframes dizzy{0%{transform:translate(22%,0)}25%{transform:translate(0,22%)}50%{transform:translate(-22%,0)}75%{transform:translate(0,-22%)}100%{transform:translate(22%,0)}}
+
+/* ---------- mouth and cheeks ---------- */
+.mouth>*{display:none}
+.mouth path,.mouth ellipse{fill:none;stroke:var(--i2);stroke-width:5;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 3px var(--glow))}
+.mouth .m-fill{fill:#1a1206}
+.mouth .m-tongue{fill:#ff7a59;stroke:none;filter:none}
+.mouth .m-grin path{stroke-width:4.5}
+.visor[data-mouth=smile] .m-smile,.visor[data-mouth=bigsmile] .m-bigsmile,.visor[data-mouth=grin] .m-grin,
+.visor[data-mouth=flat] .m-flat,.visor[data-mouth=hmm] .m-hmm,.visor[data-mouth=frown] .m-frown,
+.visor[data-mouth=wavy] .m-wavy,.visor[data-mouth=zig] .m-zig,.visor[data-mouth=o] .m-o,
+.visor[data-mouth=bigo] .m-bigo,.visor[data-mouth=snore] .m-snore,.visor[data-mouth=talk] .m-talk{display:inline}
+.m-talk{transform-box:fill-box;transform-origin:center;animation:talk .22s ease-in-out infinite alternate}
+@keyframes talk{from{transform:scale(1,.25)}to{transform:scale(1,1)}}
+.m-snore{transform-box:fill-box;transform-origin:center;animation:snore 2.4s ease-in-out infinite}
+@keyframes snore{0%,100%{transform:scale(.6)}50%{transform:scale(1.2)}}
+.visor[data-mouth=wavy] .m-wavy{animation:wobble .5s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:center}
+@keyframes wobble{from{transform:rotate(-4deg)}to{transform:rotate(4deg)}}
+.cheeks ellipse{fill:#ff8f7d;opacity:0;transition:opacity .4s}
+.visor[data-mood=happy] .cheeks ellipse,.visor[data-mood=party] .cheeks ellipse,.visor[data-blush="1"] .cheeks ellipse{opacity:.6}

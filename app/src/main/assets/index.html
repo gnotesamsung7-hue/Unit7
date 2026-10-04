@@ -24,7 +24,7 @@
     <!-- UNIT 7 -->
     <section id="tab-home" class="tab active">
       <div class="visor" id="visor" data-mood="idle" aria-hidden="true">
-        <svg viewBox="0 0 320 120">
+        <svg viewBox="0 0 320 150">
           <defs>
             <radialGradient id="iris" cx="45%" cy="40%" r="65%">
               <stop offset="0" style="stop-color:var(--i1)"/>
@@ -32,12 +32,27 @@
               <stop offset="1" style="stop-color:var(--i3)"/>
             </radialGradient>
           </defs>
-          <rect class="plate" x="6" y="14" width="308" height="92" rx="30"/>
+          <rect class="plate" x="6" y="10" width="308" height="132" rx="40"/>
           <circle class="rivet" cx="26" cy="60" r="4"/>
           <circle class="rivet" cx="294" cy="60" r="4"/>
           <g class="eye e1"><g class="lid"><circle class="ring" cx="66" cy="60" r="18"/><circle class="iris" cx="66" cy="60" r="13"/><g class="look"><circle class="pupil" cx="66" cy="60" r="5"/><circle class="glint" cx="62" cy="55" r="2.5"/></g></g></g>
           <g class="eye e2"><g class="lid"><circle class="ring" cx="128" cy="60" r="27"/><circle class="iris" cx="128" cy="60" r="20"/><g class="look"><circle class="pupil" cx="128" cy="60" r="8"/><circle class="glint" cx="121" cy="52" r="3.5"/></g></g></g>
           <g class="eye e3"><g class="lid"><circle class="ring" cx="192" cy="60" r="27"/><circle class="iris" cx="192" cy="60" r="20"/><g class="look"><circle class="pupil" cx="192" cy="60" r="8"/><circle class="glint" cx="185" cy="52" r="3.5"/></g></g></g>
+          <g class="cheeks"><ellipse cx="66" cy="102" rx="13" ry="5.5"/><ellipse cx="254" cy="102" rx="13" ry="5.5"/></g>
+          <g class="mouth">
+            <path class="m-smile" d="M141 112 Q160 126 179 112"/>
+            <path class="m-bigsmile" d="M136 110 Q160 132 184 110"/>
+            <g class="m-grin"><path class="m-fill" d="M137 109 Q160 136 183 109 Z"/><ellipse class="m-tongue" cx="160" cy="121" rx="8" ry="4.5"/></g>
+            <path class="m-flat" d="M149 116 L171 116"/>
+            <path class="m-hmm" d="M149 118 Q162 116 173 110"/>
+            <path class="m-frown" d="M143 123 Q160 109 177 123"/>
+            <path class="m-wavy" d="M137 116 q5.75 -6 11.5 0 t11.5 0 t11.5 0 t11.5 0"/>
+            <path class="m-zig" d="M138 119 l7.3 -6 l7.3 6 l7.3 -6 l7.3 6 l7.3 -6 l7.3 6"/>
+            <ellipse class="m-o m-fill" cx="160" cy="116" rx="7" ry="8"/>
+            <ellipse class="m-bigo m-fill" cx="160" cy="117" rx="10" ry="12"/>
+            <ellipse class="m-snore m-fill" cx="160" cy="116" rx="4" ry="4"/>
+            <ellipse class="m-talk m-fill" cx="160" cy="116" rx="10" ry="8"/>
+          </g>
           <g class="eye e4"><g class="lid"><circle class="ring" cx="254" cy="60" r="18"/><circle class="iris" cx="254" cy="60" r="13"/><g class="look"><circle class="pupil" cx="254" cy="60" r="5"/><circle class="glint" cx="250" cy="55" r="2.5"/></g></g></g>
         </svg>
       </div>
@@ -65,6 +80,11 @@
         </div>
         <div class="bar" role="progressbar" aria-label="Happiness" aria-valuemin="0" aria-valuemax="100"><div id="happyBar"></div></div>
         <span id="happyLabel" class="happy-label"></span>
+        <div class="traits">
+          <div><span>Bravery</span><div class="bar thin"><div id="braveBar"></div></div></div>
+          <div><span>Curiosity</span><div class="bar thin"><div id="curiousBar"></div></div></div>
+        </div>
+        <button id="logBtn" class="linkbtn">Story and maintenance log</button>
       </div>
 
       <h2>Games</h2>
@@ -151,6 +171,22 @@
 
     <!-- SETUP -->
     <section id="tab-setup" class="tab">
+      <h2>About you</h2>
+      <div class="field">
+        <label for="pName">Your name (Unit 7 uses it)</label>
+        <input id="pName" autocomplete="off" spellcheck="false" placeholder="Operator">
+      </div>
+
+      <h2>Personality</h2>
+      <p class="note">How often Unit 7 talks and does things on his own when you're not giving orders.</p>
+      <div class="seg" role="radiogroup" aria-label="Chattiness">
+        <button data-chat="quiet" role="radio">Quiet</button>
+        <button data-chat="normal" role="radio">Normal</button>
+        <button data-chat="chatty" role="radio">Chatty</button>
+      </div>
+      <label class="toggle"><input type="checkbox" id="pIdleMoves"><span>Idle moves: bolt checks and stretches in place</span></label>
+      <label class="toggle"><input type="checkbox" id="pWander"><span>Let him wander: small turns when he's curious</span></label>
+
       <h2>Robot</h2>
       <p class="note">Join the robot’s Wi-Fi (“Robot - …”, password 12345678), then come back here.</p>
       <div class="field">
@@ -190,6 +226,16 @@
 
   <div id="toast" class="toast" role="status"></div>
 
+  <div id="logScreen" class="role" hidden>
+    <div class="role-in log-in">
+      <div class="log-head"><h1>Unit 7’s files</h1><button id="logClose" class="btn">Close</button></div>
+      <h2>The missing units</h2>
+      <div id="storyList"></div>
+      <h2>Maintenance log</h2>
+      <div id="logList"></div>
+    </div>
+  </div>
+
   <div id="eyesHint" class="eyes-hint">Hold the screen for 3 seconds to leave Eyes mode</div>
 
   <div id="roleScreen" class="role" hidden>
@@ -222,5 +268,7 @@
 <script src="app.js"></script>
 <script src="senses.js"></script>
 <script src="play.js"></script>
+<script src="head.js"></script>
+<script src="persona.js"></script>
 </body>
 </html>
