@@ -63,11 +63,6 @@ function senseFrame(video){
     if (r.light.seen) $("#visor").dataset.look = r.light.x < -0.3 ? "left" : r.light.x > 0.3 ? "right" : "";
     return;   // no wave detection while chasing a light
   }
-  if (!quiet && waveTick(r, now) && now - SENSE.lastWave > 6000) {
-    SENSE.lastWave = now;
-    wake();
-    sendUp({t: "wave"}) || say(pick("gestureWave"));
-  }
 }
 
 // Send to the controller if it is around. Returns false when the Eyes phone is on its own.

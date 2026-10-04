@@ -109,7 +109,7 @@ function setOnline(on){
   $("#dot").classList.toggle("on", on);
   $("#dot").setAttribute("aria-label", on ? "Connected" : "Not connected");
   if (on && !S.everOnline) { S.everOnline = true; if (booted) say(pick("connected")); }
-  else if (!on && S.everOnline) { say(pick("lostLink")); S.driving = false; $("#driveBtn").classList.remove("held"); }
+  else if (!on && S.everOnline) { S.driving = false; $("#driveBtn").classList.remove("held"); }
   renderStatus();
 }
 
@@ -347,7 +347,7 @@ function parse(raw){
   if (has("chief","voltnutt","voltnut","boss")) return {cmd:"chief"};
   if (has("thank","thanks","cheers")) return {cmd:"thanks"};
   if (has("good","great","nice","awesome","clever","well")) return {cmd:"praise"};
-  if (has("wave","hello","hi","hey","greet")) return {cmd:"wave"};
+  if (has("wave","hello","hi")) return {cmd:"wave"};
   return null;
 }
 
@@ -854,14 +854,14 @@ const CARDS = {
   OIL:     {mood:"happy",   line:"cardOil",     ms:5000, move: () => walkSteps(ACT.forward, 2, "Walking to the oil can")},
   SLEEP:   {mood:"sleep",   line:"sleep",       ms:15000, move: () => runAction(ACT.sleep)},
   WAKE:    {mood:"happy",   line:"cardWake",    ms:3000, move: () => runAction(ACT.stand)},
-  HELLO:   {mood:"happy",   line:"wave",        ms:3000, move: () => runAction(ACT.wave)},
+  HELLO:   {mood:"happy",   line:"cardHello",   ms:3000},
   JUMP:    {jump:true},
   HAPPY:   {mood:"happy",   line:"cardHappy",   ms:6000, move: () => wiggle([ACT.stepleft, ACT.stepright])},
   SCARED:  {mood:"worried", line:"cardScared",  ms:6000, move: () => walkSteps(ACT.backward, 2, "Backing away")},
   FIERCE:  {mood:"angry",   line:"cardFierce",  ms:6000, move: () => runAction(ACT.fight)},
   SAD:     {mood:"sad",     line:"cardSad",     ms:8000, move: () => runAction(ACT.sit)},
   CURIOUS: {mood:"think",   line:"cardCurious", ms:6000, move: () => wiggle([ACT.turnleft, ACT.turnright])},
-  CHIEF:   {mood:"happy",   line:"cardChief",   ms:4000, move: () => runAction(ACT.wave)}
+  CHIEF:   {mood:"happy",   line:"cardChief",   ms:4000, move: () => runAction(ACT.stand)}
 };
 async function doCard(code){
   if (window.playCard && playCard(code)) return;

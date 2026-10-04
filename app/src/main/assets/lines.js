@@ -12,9 +12,6 @@ window.LINES = {
     ["happy", "[Leg tap] Body link established. Four-point stability confirmed."],
     ["happy", "Legs detected. One, two, three, four. Good. Nobody is missing."]
   ],
-  lostLink: [
-    ["worried", "[Joint creak] Link to body lost. I am still here. My legs just can't hear me."]
-  ],
   forward: [
     ["busy", "Work order accepted. Proceeding forward."],
     ["busy", "[Leg tap] Forward. Counting steps."],
@@ -121,6 +118,7 @@ window.LINES = {
   cardSad: [["sad", "[Joint creak] Sad card. I need to sit down for a moment."]],
   cardCurious: [["think", "Curious. Scanning the area. Left… right…"]],
   cardChief: [["happy", "[Leg tap] Chief! Unit 7 reporting for duty. All bolts checked."]],
+  cardHello: [["happy", "Hello, operator! Say hello or hi and I'll wave."]],
   cardColor: [["happy", "[Gyro whir] Lens colour changed to {c}."]],
   cardAmber: [["happy", "[Gyro whir] Back to standard amber. Factory settings."]],
   cardUnknown: [["think", "[Leg tap] That code isn't one of my cards."]],

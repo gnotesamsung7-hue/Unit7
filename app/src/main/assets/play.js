@@ -272,8 +272,7 @@ function playStop(){
   if (GAME.on && GAME.kind === "seek") endGame(true);
 }
 function playLink(m){
-  if (m.t === "wave") onWave();
-  else if (m.t === "clap") onClap(m.n | 0);
+  if (m.t === "clap") onClap(m.n | 0);
   else if (m.t === "light") { FOLLOW.light = m; if (m.seen) FOLLOW.seenAt = Date.now(); }
 }
 function playCard(code){
@@ -300,7 +299,6 @@ function playCard(code){
     S.hold = {m: "happy", until: Date.now() + 5000};
     say(pick("encourage" + n));
     award(n);
-    if (S.online && !busyNow()) runAction(ACT.wave);
     return true;
   }
   return false;
@@ -342,7 +340,8 @@ function playExecute(c){
 }
 
 /* ---------- Hands-free "Hey Unit 7" ---------- */
-const WAKE_RE = /(hey |hi |ok |a )?(unit|you knit|unit's|unix) ?(7|seven|set)\b/;
+const WAKE_RE = /(hey |hi |hello |ok |a )?(unit|you knit|unit's|unix) ?(7|seven|set)\b/;
+const GREET_RE = /^\s*(hello|hi)( there)?( (unit|you knit) ?(7|seven))?\s*$/;
 let wakeArmed = 0, wakeT = null;
 function wakeListen(delay){
   clearTimeout(wakeT);
@@ -365,6 +364,7 @@ function wakeHeard(kind, data){
   }
   const list = (data || []).map(x => String(x).toLowerCase());
   for (const alt of list) {
+    if (GREET_RE.test(alt)) { wakeArmed = 0; $("#heard").textContent = "You: " + alt; execute({cmd: "wave"}); break; }
     if (Date.now() < wakeArmed) {
       const c = parse(alt);
       if (c) { wakeArmed = 0; $("#heard").textContent = "You: " + alt; execute(c); break; }
