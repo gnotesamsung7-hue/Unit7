@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Unit 7</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>Unit 7</h1>
+      <p id="statusLine">Looking for my body…</p>
+    </div>
+    <div class="top-r">
+      <span id="dot" class="dot" role="img" aria-label="Not connected"></span>
+      <button id="stopBtn" class="stop">Stop</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- UNIT 7 -->
+    <section id="tab-home" class="tab active">
+      <div class="visor" id="visor" data-mood="idle" aria-hidden="true">
+        <svg viewBox="0 0 320 120">
+          <defs>
+            <radialGradient id="iris" cx="45%" cy="40%" r="65%">
+              <stop offset="0" stop-color="#ffe08a"/>
+              <stop offset=".45" stop-color="#ffb21c"/>
+              <stop offset="1" stop-color="#b86a00"/>
+            </radialGradient>
+          </defs>
+          <rect class="plate" x="6" y="14" width="308" height="92" rx="30"/>
+          <circle class="rivet" cx="26" cy="60" r="4"/>
+          <circle class="rivet" cx="294" cy="60" r="4"/>
+          <g class="eye e1"><g class="lid"><circle class="ring" cx="66" cy="60" r="18"/><circle class="iris" cx="66" cy="60" r="13"/><g class="look"><circle class="pupil" cx="66" cy="60" r="5"/><circle class="glint" cx="62" cy="55" r="2.5"/></g></g></g>
+          <g class="eye e2"><g class="lid"><circle class="ring" cx="128" cy="60" r="27"/><circle class="iris" cx="128" cy="60" r="20"/><g class="look"><circle class="pupil" cx="128" cy="60" r="8"/><circle class="glint" cx="121" cy="52" r="3.5"/></g></g></g>
+          <g class="eye e3"><g class="lid"><circle class="ring" cx="192" cy="60" r="27"/><circle class="iris" cx="192" cy="60" r="20"/><g class="look"><circle class="pupil" cx="192" cy="60" r="8"/><circle class="glint" cx="185" cy="52" r="3.5"/></g></g></g>
+          <g class="eye e4"><g class="lid"><circle class="ring" cx="254" cy="60" r="18"/><circle class="iris" cx="254" cy="60" r="13"/><g class="look"><circle class="pupil" cx="254" cy="60" r="5"/><circle class="glint" cx="250" cy="55" r="2.5"/></g></g></g>
+        </svg>
+      </div>
+
+      <div class="log" aria-live="polite">
+        <p id="says">…</p>
+        <p id="heard" class="heard"></p>
+      </div>
+
+      <button id="micBtn" class="mic">
+        <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        <span id="micLabel">Talk to Unit 7</span>
+      </button>
+      <p class="hint" id="micHint">Try “walk forward three steps”, “turn left”, “wave”, “dance”, or “jump”.</p>
+
+      <h2>Quick orders</h2>
+      <div class="chips">
+        <button data-say="wave">Wave</button>
+        <button data-say="dance">Dance</button>
+        <button data-say="hop">Hop</button>
+        <button data-say="pushups">Push-ups</button>
+        <button data-say="sit">Sit</button>
+        <button data-say="stand">Stand</button>
+        <button data-say="sleep">Sleep</button>
+        <button data-say="intro">Who are you?</button>
+      </div>
+    </section>
+
+    <!-- PILOT -->
+    <section id="tab-pilot" class="tab">
+      <p class="note">Hold the drive button and tilt the phone. Tilt away to walk forward, toward you to back up, sideways to turn. How you hold the phone when you press is “level”.</p>
+
+      <div class="gauge">
+        <svg viewBox="0 0 200 200" aria-hidden="true">
+          <circle class="g-out" cx="100" cy="100" r="92"/>
+          <circle class="g-dead" cx="100" cy="100" r="25"/>
+          <path class="g-cross" d="M100 14v172M14 100h172"/>
+          <text x="100" y="32" class="g-lab">Forward</text>
+          <text x="100" y="180" class="g-lab">Back</text>
+          <text x="30" y="104" class="g-lab">Left</text>
+          <text x="170" y="104" class="g-lab">Right</text>
+          <circle id="gDot" class="g-dot" cx="100" cy="100" r="13"/>
+        </svg>
+        <p id="gText" class="g-text">Tilt sensor starting…</p>
+      </div>
+
+      <div class="seg" role="radiogroup" aria-label="Walking style">
+        <button data-walk="builtin" role="radio">Normal walk</button>
+        <button data-walk="high" role="radio">High-step</button>
+      </div>
+      <p class="note small" id="walkNote"></p>
+
+      <button id="driveBtn" class="drive">Hold to drive</button>
+    </section>
+
+    <!-- LEGS -->
+    <section id="tab-legs" class="tab">
+      <p class="note">Tap a leg to pick it. Move it with the sliders, or hold “Move with tilt” and tilt the phone.</p>
+      <div class="spider">
+        <svg viewBox="0 0 300 290" id="spiderSvg">
+          <rect class="body" x="104" y="88" width="92" height="114" rx="26"/>
+          <circle class="b-eye" cx="132" cy="102" r="3.5"/><circle class="b-eye" cx="144" cy="100" r="5"/>
+          <circle class="b-eye" cx="156" cy="100" r="5"/><circle class="b-eye" cx="168" cy="102" r="3.5"/>
+          <text x="150" y="20" class="front">Front</text>
+          <g id="legsLayer"></g>
+        </svg>
+      </div>
+      <p class="legname" id="legName">Right front leg</p>
+      <div class="ctl">
+        <div class="row">
+          <label for="legLift">Lift <output id="legLiftOut"></output></label>
+          <input type="range" id="legLift" min="-25" max="55" step="1" value="0">
+          <div class="ends"><span>Push down</span><span>Raised</span></div>
+        </div>
+        <div class="row">
+          <label for="legSwing">Swing <output id="legSwingOut"></output></label>
+          <input type="range" id="legSwing" min="40" max="140" step="1" value="90">
+          <div class="ends"><span>Back</span><span>Forward</span></div>
+        </div>
+      </div>
+      <label class="toggle"><input type="checkbox" id="balance"><span>Balance assist: lean away from the raised leg</span></label>
+      <div class="btns">
+        <button id="legTiltBtn" class="btn primary">Move with tilt</button>
+        <button id="standBtn" class="btn">Stand all</button>
+        <button id="hopBtn" class="btn">Hop</button>
+      </div>
+    </section>
+
+    <!-- SETUP -->
+    <section id="tab-setup" class="tab">
+      <h2>Robot</h2>
+      <p class="note">Join the robot’s Wi-Fi (“Robot - …”, password 12345678), then come back here.</p>
+      <div class="field">
+        <label for="addr">Robot address</label>
+        <input id="addr" inputmode="url" autocomplete="off" spellcheck="false">
+      </div>
+      <button id="testBtn" class="btn">Check connection</button>
+
+      <h2>Voice</h2>
+      <label class="toggle"><input type="checkbox" id="pTalk"><span>Unit 7 speaks out loud</span></label>
+      <label class="toggle"><input type="checkbox" id="pSfx"><span>Sound effects (leg taps, gyro whirs)</span></label>
+      <label class="toggle"><input type="checkbox" id="pOffline"><span>Prefer offline speech recognition</span></label>
+      <p class="note small">On the robot’s Wi-Fi there’s no internet. Offline recognition needs the English offline pack: Settings › Google › Voice › Offline speech recognition. If voice stops working, turn this off to use mobile data instead.</p>
+
+      <h2>Tilt</h2>
+      <label class="toggle"><input type="checkbox" id="pFlip"><span>Flip phone face-down to stop</span></label>
+      <label class="toggle"><input type="checkbox" id="pInvF"><span>Swap forward and back</span></label>
+      <label class="toggle"><input type="checkbox" id="pInvT"><span>Swap left and right</span></label>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <nav>
+    <button data-tab="home" class="active"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="5"/><circle cx="9.5" cy="12" r="1.6"/><circle cx="14.5" cy="12" r="1.6"/></svg>Unit 7</button>
+    <button data-tab="pilot"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5" transform="rotate(-14 12 12)"/><path d="M3 8c-1 2-1 6 0 8M21 8c1 2 1 6 0 8"/></svg>Pilot</button>
+    <button data-tab="legs"><svg viewBox="0 0 24 24"><rect x="9" y="8" width="6" height="8" rx="2.5"/><path d="M9 10 5 6 3 8M15 10l4-4 2 2M9 14l-4 4-2-2M15 14l4 4 2-2"/></svg>Legs</button>
+    <button data-tab="setup"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>Setup</button>
+  </nav>
+</div>
+<script src="lines.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

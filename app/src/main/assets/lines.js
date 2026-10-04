@@ -1,0 +1,111 @@
+/* Unit 7's voice. [Brackets] play as sound effects, not speech.
+   Each entry: [mood, line]. One is picked at random. */
+window.LINES = {
+  boot: [
+    ["happy", "[Gyro whir] Unit 7, online. All four legs present. I checked twice."],
+    ["happy", "[Leg tap] Maintenance crawler Unit 7, reporting. Ready for work orders."]
+  ],
+  bootNoRobot: [
+    ["worried", "[Gyro whir] Unit 7, online. But I can't feel my legs. Please connect me to the robot's Wi-Fi."]
+  ],
+  connected: [
+    ["happy", "[Leg tap] Body link established. Four-point stability confirmed."],
+    ["happy", "Legs detected. One, two, three, four. Good. Nobody is missing."]
+  ],
+  lostLink: [
+    ["worried", "[Joint creak] Link to body lost. I am still here. My legs just can't hear me."]
+  ],
+  forward: [
+    ["busy", "Work order accepted. Proceeding forward."],
+    ["busy", "[Leg tap] Forward. Counting steps."],
+    ["busy", "Advancing. Chief says the Origin Press is this way. Probably."]
+  ],
+  backward: [
+    ["busy", "Reversing. Watching where I put my back legs."],
+    ["busy", "[Leg tap] Backing up. Carefully. Very carefully."]
+  ],
+  turnleft: [
+    ["busy", "[Leg tap] Rotating left. Please tell Chief I did it neatly."],
+    ["busy", "Turning left. Pivot sequence engaged."]
+  ],
+  turnright: [
+    ["busy", "[Leg tap] Rotating right."],
+    ["busy", "Turning right. All feet accounted for."]
+  ],
+  stepleft: [["busy", "Side-step left. Crab mode."]],
+  stepright: [["busy", "Side-step right. Crab mode."]],
+  stop: [
+    ["idle", "Halted. Holding position. I am very good at holding position."],
+    ["idle", "[Leg tap] Stopped. All four feet on the ground."]
+  ],
+  emergency: [
+    ["surprised", "[Joint creak] Emergency stop! Freezing!"]
+  ],
+  flipStop: [
+    ["surprised", "Phone flipped. Emergency stop. I'm not moving a single bolt."]
+  ],
+  sit: [
+    ["sleep", "Lowering chassis. A short rest is allowed in the manual. Page forty."]
+  ],
+  stand: [
+    ["happy", "[Gyro whir] Standing up. Tall as a maintenance crawler gets."]
+  ],
+  wave: [
+    ["happy", "[Leg tap] Hello! This is my front-right leg. It is also saying hello."],
+    ["happy", "Greeting protocol. Wave, wave."]
+  ],
+  dance: [
+    ["happy", "[Gyro whir] Dance routine. Sparky taught me this one. Don't tell Chief."],
+    ["happy", "Rhythm subroutine loaded. Please don't film this."]
+  ],
+  pushups: [
+    ["busy", "Push-ups. Strength maintenance. One… two…"]
+  ],
+  fight: [
+    ["worried", "[Joint creak] Defensive stance. I'm very fierce. Mostly."]
+  ],
+  sleep: [
+    ["sleep", "Entering low-power mode. Wake me if a bolt needs checking."]
+  ],
+  center: [
+    ["think", "[Gyro whir] Centering all servos. Recalibrating my sense of straight."]
+  ],
+  hopStart: [
+    ["surprised", "Jump requested. This is the best day of my—"],
+    ["surprised", "Crouching. Charging legs. Here I go!"]
+  ],
+  hopLand: [
+    ["happy", "[Gyro whir] Landing. Did I go up? Please say I went up."],
+    ["happy", "[Leg tap] I left the ground! I think. Logging it as a yes."]
+  ],
+  hopCooldown: [
+    ["worried", "My legs need a few seconds before the next jump. Safety regulation."]
+  ],
+  legLift: [
+    ["think", "Lifting the leg. Three-point balance… [Joint creak] mostly confirmed."]
+  ],
+  pilotOn: [
+    ["busy", "Pilot link active. Tilt me where you need me."]
+  ],
+  intro: [
+    ["happy", "I'm Unit 7, a maintenance crawler from the Aegis line. I climb into machines and check bolts. I travel with Chief, Sparky and Whirr to the Origin Press. There were never Units one through six. The label printer jammed. I think."]
+  ],
+  chief: [
+    ["think", "Chief is Voltnutt. He talks like someone who used to own planets. I don't ask about it."]
+  ],
+  thanks: [["happy", "[Leg tap] Happy to be of service."]],
+  praise: [
+    ["happy", "[Gyro whir] Praise logged. Saving it to permanent memory."],
+    ["happy", "Thank you. I will tell the other units. If I ever find them."]
+  ],
+  hello: [["happy", "Hello, operator. Unit 7 at your service."]],
+  unknown: [
+    ["think", "[Leg tap] That instruction is not in my manual. Could you say it again, slower?"],
+    ["think", "Unrecognized work order. Try walk, turn, wave, dance, or jump."]
+  ],
+  didntHear: [["think", "I didn't catch that. My audio sensor is very small."]],
+  batteryOk: [["happy", "Phone power at {n} percent. Plenty for work."]],
+  batteryLow: [["worried", "[Joint creak] Phone power at {n} percent. Requesting a recharge and maybe a small rest."]],
+  noLink: [["worried", "I can't reach my legs. Join the robot's Wi-Fi first."]],
+  count: [["busy", "{n}."]]
+};
