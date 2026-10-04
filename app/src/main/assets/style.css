@@ -195,3 +195,20 @@ body.eyes-mode .eyes-hint.gone{opacity:0}
 .swatches{display:flex;flex-wrap:wrap;gap:10px}
 .swatches button{width:48px;height:48px;border-radius:50%;border:3px solid var(--line)}
 .swatches button[aria-pressed=true]{border-color:var(--text)}
+
+/* ---------- meter, games ---------- */
+.meter{margin-top:22px;background:var(--plate);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.meter-top{display:flex;justify-content:space-between;align-items:flex-end;gap:10px}
+.meter-top strong{display:block;font:700 19px var(--cond);color:var(--amber)}
+.meter-top span{color:var(--muted);font-size:13.5px}
+.meter .next{text-align:right}
+.bar{height:10px;border-radius:5px;background:var(--steel);margin:12px 0 6px;overflow:hidden}
+.bar div{height:100%;width:60%;background:linear-gradient(90deg,var(--amber-deep),var(--amber));border-radius:5px;transition:width .6s}
+.happy-label{color:var(--muted);font-size:13px}
+.gamebar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0 0;padding:12px 14px;border-radius:14px;background:#33280f;border:1px solid var(--amber-deep)}
+.gamebar[hidden]{display:none}
+.gamebar strong{display:block;font:700 18px var(--cond);color:var(--amber)}
+.gamebar span{color:var(--text);font-size:14px}
+.gamebar button{min-height:44px;padding:0 16px;border-radius:12px;background:var(--plate);border:1px solid var(--line);font-weight:600}
+.visor[data-happy=high] .iris{filter:drop-shadow(0 0 11px var(--glow2))}
+.visor[data-happy=low][data-mood=idle] .lid{transform:scaleY(.8) translateY(6%)}

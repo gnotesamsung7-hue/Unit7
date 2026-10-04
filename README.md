@@ -16,5 +16,8 @@ for 3 seconds to leave Eyes mode.
 **QR cards:** the Eyes phone watches through its front camera for Unit 7 cards
 (see Unit7_Cards_and_Guide.pdf) and reacts with eyes, voice and movement.
 
+**Also:** wave and clap reactions, follow-the-light, four games (Colour Quiz, Copy Me,
+Hide and Seek, Treasure Hunt), encourage points with ranks, and hands-free "Hey Unit 7".
+
 Connect both phones to the robot's Wi-Fi ("Robot - ...", password 12345678).
 The APK is built by GitHub Actions: Actions tab → latest run → Unit7-apk.

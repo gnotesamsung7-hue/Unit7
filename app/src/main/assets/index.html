@@ -42,6 +42,11 @@
         </svg>
       </div>
 
+      <div id="gameBar" class="gamebar" hidden>
+        <div><strong id="gameName">Game</strong><span id="gameScore"></span></div>
+        <button id="endGameBtn">End game</button>
+      </div>
+
       <div class="log" aria-live="polite">
         <p id="says">…</p>
         <p id="heard" class="heard"></p>
@@ -51,7 +56,25 @@
         <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
         <span id="micLabel">Talk to Unit 7</span>
       </button>
-      <p class="hint" id="micHint">Try “walk forward three steps”, “turn left”, “wave”, “dance”, or “jump”.</p>
+      <p class="hint" id="micHint">Try “walk forward three steps”, “follow the light”, “play colour quiz”, or “how happy are you?”</p>
+
+      <div class="meter">
+        <div class="meter-top">
+          <div><strong id="rankName">Trainee Crawler</strong><span id="points">0 points</span></div>
+          <span id="nextRank" class="next"></span>
+        </div>
+        <div class="bar" role="progressbar" aria-label="Happiness" aria-valuemin="0" aria-valuemax="100"><div id="happyBar"></div></div>
+        <span id="happyLabel" class="happy-label"></span>
+      </div>
+
+      <h2>Games</h2>
+      <div class="chips">
+        <button data-game="quiz">Colour Quiz</button>
+        <button data-game="copy">Copy Me</button>
+        <button data-game="seek">Hide and Seek</button>
+        <button data-game="hunt">Treasure Hunt</button>
+        <button id="followBtn">Follow the light</button>
+      </div>
 
       <h2>Quick orders</h2>
       <div class="chips">
@@ -150,6 +173,8 @@
       <h2>Voice</h2>
       <label class="toggle"><input type="checkbox" id="pTalk"><span>Unit 7 speaks out loud</span></label>
       <label class="toggle"><input type="checkbox" id="pSfx"><span>Sound effects (leg taps, gyro whirs)</span></label>
+      <label class="toggle"><input type="checkbox" id="pWake"><span>Hands-free: listen for “Hey Unit 7”</span></label>
+      <p class="note small">Keeps the microphone on and uses more battery. Some phones beep each time listening restarts.</p>
       <label class="toggle"><input type="checkbox" id="pOffline"><span>Prefer offline speech recognition</span></label>
       <p class="note small">On the robot’s Wi-Fi there’s no internet. Offline recognition needs the English offline pack: Settings › Google › Voice › Offline speech recognition. If voice stops working, turn this off to use mobile data instead.</p>
 
@@ -157,6 +182,9 @@
       <label class="toggle"><input type="checkbox" id="pFlip"><span>Flip phone face-down to stop</span></label>
       <label class="toggle"><input type="checkbox" id="pInvF"><span>Swap forward and back</span></label>
       <label class="toggle"><input type="checkbox" id="pInvT"><span>Swap left and right</span></label>
+
+      <h2>Follow the light</h2>
+      <label class="toggle"><input type="checkbox" id="pLightInv"><span>Swap light left and right (if he turns away from the light)</span></label>
     </section>
   </main>
 
@@ -192,5 +220,7 @@
 <script src="jsQR.js"></script>
 <script src="lines.js"></script>
 <script src="app.js"></script>
+<script src="senses.js"></script>
+<script src="play.js"></script>
 </body>
 </html>

@@ -52,7 +52,7 @@ function clampA(i,a){
 
 /* ---------- Preferences ---------- */
 const DEFAULTS = {base:"192.168.4.1", talk:true, sfx:true, offline:true, flipStop:true,
-  invF:false, invT:false, walk:"builtin", balance:true, role:null, eyesAddr:"", color:"amber"};
+  invF:false, invT:false, walk:"builtin", balance:true, role:null, eyesAddr:"", color:"amber", wake:false, lightInv:false};
 const P = Object.assign({}, DEFAULTS, (() => { try { return JSON.parse(localStorage.getItem("u7.prefs")) || {}; } catch(e){ return {}; } })());
 const savePrefs = () => { try { localStorage.setItem("u7.prefs", JSON.stringify(P)); } catch(e){} };
 
@@ -80,8 +80,13 @@ const U7 = window.U7 = {
 };
 
 /* ---------- Robot link ---------- */
+let lastQuiet = 0;
 async function req(method, path){
   const url = "http://" + P.base + path;
+  // Tell the Eyes phone the servos are about to make noise, so it doesn't mistake them for claps or waves.
+  if (method === "POST" && path !== "/api/v1/stop" && P.role === "ctl" && S.eyes.linked && Date.now() - lastQuiet > 1000) {
+    lastQuiet = Date.now(); linkSend({t:"quiet", ms:2500});
+  }
   let r;
   if (HAS) {
     const id = "r" + (++rid);
@@ -144,6 +149,7 @@ async function runAction(id){
 }
 
 async function emergencyStop(silent){
+  if (window.playStop) playStop();
   S.token++; S.custom = null; S.driving = false; S.legTilt = false;
   $("#driveBtn").classList.remove("held"); $("#legTiltBtn").classList.remove("held");
   await req("POST", "/api/v1/stop");
@@ -201,6 +207,7 @@ async function doSay({mood, text}, tok){
   $("#says").innerHTML = text.replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]))
     .replace(/\[(.+?)\]/g, '<span class="tic">[$1]</span>');
   const parts = text.split(/(\[[^\]]+\])/).map(s => s.trim()).filter(Boolean);
+  S.speaking = true;
   for (const part of parts) {
     if (tok !== sayTok) return;
     const tic = part.match(/^\[(.+)\]$/);
@@ -208,6 +215,7 @@ async function doSay({mood, text}, tok){
     if (P.talk && HAS) await speakNative(part);
     else await sleep(Math.min(4000, 400 + part.length * 45));
   }
+  S.speaking = false; S.spokeAt = Date.now();
   if (tok === sayTok && !S.listening) setMood(restMood());
 }
 // After a card, its mood lingers for a few seconds before Unit 7 relaxes.
@@ -317,6 +325,7 @@ function parse(raw){
   else if (has("once")) n = 1; else if (has("twice")) n = 2;
   if (n) n = clamp(n, 1, 10);
 
+  if (window.playParse) { const pc = playParse(t, has); if (pc) return pc; }
   if (has("stop","halt","freeze","hold","wait","enough","stay","quit","cancel")) return {cmd:"stop"};
   if (has("jump","hop","leap","bounce")) return {cmd:"hop"};
   if (has("dance","party","boogie","groove")) return {cmd:"dance"};
@@ -346,6 +355,7 @@ async function execute(c){
   if (!c) { beep("down"); say(pick("unknown")); return; }
   const talkOnly = ["intro","chief","thanks","praise","battery"];
   if (c.cmd === "stop") { hush(); emergencyStop(true); say(pick("stop")); return; }
+  if (window.playExecute && playExecute(c)) return;
   if (talkOnly.includes(c.cmd)) {
     if (c.cmd === "battery") {
       const n = HAS ? Android.battery() : 100;
@@ -384,6 +394,7 @@ function startListen(){
   audio();
   if (!HAS) { toast("Voice works in the Android app."); return; }
   if (S.listening) { Android.stopListening(); return; }
+  S.wakeListening = false;
   hush();
   S.listening = true; micUI(); setMood("listen"); beep("up");
   $("#heard").textContent = "Listening…";
@@ -394,6 +405,7 @@ function micUI(){
   $("#micLabel").textContent = S.listening ? "Listening… tap to finish" : "Talk to Unit 7";
 }
 function heard(kind, data){
+  if (S.wakeListening && window.wakeHeard) { wakeHeard(kind, data); return; }
   if (kind === "ready") return;
   if (kind === "partial") { if (data && data[0]) $("#heard").textContent = "You: " + data[0]; return; }
   if (kind === "end") return;
@@ -404,11 +416,13 @@ function heard(kind, data){
     let c = null;
     for (const alt of list) { c = parse(alt); if (c) break; }
     execute(c);
+    if (window.wakeResume) wakeResume();
     return;
   }
   // errors
   const code = String(data);
   setMood("idle");
+  if (window.wakeResume) wakeResume();
   if (code === "7" || code === "6") { $("#heard").textContent = ""; say(pick("didntHear")); }
   else if (code === "mic-permission" || code === "9") toast("Allow microphone access for Unit 7, then try again.");
   else if (code === "no-recognizer") toast("This phone has no speech recognition service installed.");
@@ -710,6 +724,7 @@ function linkIn(raw, from){
       if (m.bat != null && m.bat > 30) S.eyes.warned = false;
     } else if (m.t === "said" && saidWait[m.id]) { const f = saidWait[m.id]; delete saidWait[m.id]; f(); }
     else if (m.t === "card") doCard(String(m.c));
+    else if (window.playLink) playLink(m);
     return;
   }
   // Eyes phone
@@ -725,7 +740,8 @@ function linkIn(raw, from){
   } else if (m.t === "mood") $("#visor").dataset.mood = m.m;
   else if (m.t === "look") $("#visor").dataset.look = m.d;
   else if (m.t === "hush") hush();
-  else if (m.t === "color") { P.color = m.c; savePrefs(); applyColor(m.c); }
+  else if (m.t === "color") { if (!m.temp) { P.color = m.c; savePrefs(); } applyColor(m.c); }
+  else if (window.senseLink) senseLink(m);
 }
 function renderEyesLink(){
   const on = S.eyes.linked;
@@ -752,6 +768,7 @@ function startEyes(){
   if (HAS) { Android.eyesMode(true); Android.linkStart(); }
   $("#visor").dataset.mood = "sleep"; S.ctlAsleep = true;
   startScanner();
+  if (window.startEars) startEars();
   setTimeout(() => $("#eyesHint").classList.add("gone"), 5000);
   setInterval(() => {
     linkSend({t:"hb", bat: HAS ? Android.battery() : null});
@@ -779,7 +796,7 @@ function startController(){
   (async () => {
     await refreshState();
     booted = true;
-    say(pick(S.online ? "boot" : "bootNoRobot"));
+    say(pick(!S.online ? "bootNoRobot" : window.bootKey ? bootKey() : "boot"));
   })();
 }
 $("#eyesAddr").value = P.eyesAddr;
@@ -798,7 +815,8 @@ const COLORS = {
   blue:   ["#bfe6ff","#2fa8ff","#0b4f9e","47,168,255"],
   green:  ["#c8ffcf","#3ddc6a","#137a33","61,220,106"],
   purple: ["#e8c9ff","#b25cff","#5b1d9e","178,92,255"],
-  white:  ["#ffffff","#dfe9f0","#8fa1ad","223,233,240"]
+  white:  ["#ffffff","#dfe9f0","#8fa1ad","223,233,240"],
+  gold:   ["#fff3b0","#ffd23f","#a07800","255,210,63"]
 };
 function applyColor(name){
   const c = COLORS[name] || COLORS.amber, v = $("#visor").style;
@@ -811,10 +829,12 @@ function setColor(name){
   P.color = name; savePrefs(); applyColor(name);
   if (P.role === "ctl" && S.eyes.linked) linkSend({t:"color", c:name});
 }
-$("#swatches").innerHTML = Object.keys(COLORS).map(k =>
+function renderSwatches(){
+$("#swatches").innerHTML = Object.keys(COLORS).filter(k => k !== "gold" || (window.goldUnlocked && goldUnlocked())).map(k =>
   '<button data-color="' + k + '" aria-label="' + k + '" style="background:' + COLORS[k][1] + '"></button>').join("");
 $$("#swatches button").forEach(b => b.addEventListener("click", () => setColor(b.dataset.color)));
 applyColor(P.color);
+}
 
 /* ---------- QR cards ---------- */
 // Card text: "UNIT7:<NAME>" or "UNIT7:COLOR:<colour>"
@@ -844,6 +864,7 @@ const CARDS = {
   CHIEF:   {mood:"happy",   line:"cardChief",   ms:4000, move: () => runAction(ACT.wave)}
 };
 async function doCard(code){
+  if (window.playCard && playCard(code)) return;
   const parts = code.split(":");
   if (parts[0] !== "UNIT7") { say(pick("cardUnknown")); return; }
   if (parts[1] === "COLOR") {
@@ -876,8 +897,11 @@ async function startScanner(){
   const v = $("#cam"); v.srcObject = stream; await v.play().catch(() => {});
   scan.on = true;
   const cv = $("#scan"), ctx = cv.getContext("2d", {willReadFrequently: true});
+  let tick = 0;
   setInterval(() => {
     if (!v.videoWidth || scan.busy) return;
+    if (window.senseFrame) senseFrame(v);
+    if ((++tick) % 2) return;
     const w = 400, h = Math.round(w * v.videoHeight / v.videoWidth);
     cv.width = w; cv.height = h;
     scan.flip = !scan.flip;   // try both ways in case the camera mirrors
@@ -886,12 +910,13 @@ async function startScanner(){
     const img = ctx.getImageData(0, 0, w, h);
     const r = jsQR(img.data, w, h, {inversionAttempts: "dontInvert"});
     if (r && r.data) cardSeen(r.data.trim());
-  }, 300);
+  }, 250);
 }
 function cardSeen(code){
   const now = Date.now();
-  if (code === scan.last && now - scan.lastAt < 6000) return;
-  if (now - scan.lastAt < 2000) return;
+  const game = window.SENSE && SENSE.game;
+  if (code === scan.last && now - scan.lastAt < (game ? 2500 : 6000)) return;
+  if (now - scan.lastAt < (game ? 1000 : 2000)) return;
   scan.last = code; scan.lastAt = now;
   wake(); beep("up");
   $("#visor").dataset.mood = "seen";
@@ -902,6 +927,7 @@ function cardSeen(code){
 
 /* ---------- Start ---------- */
 let booted = false;
+window.addEventListener("load", () => { renderSwatches(); if (window.playInit) playInit(); });
 renderWalk(); drawSpider(); renderStatus();
 if (P.role === "eyes") startEyes();
 else if (P.role === "ctl") startController();

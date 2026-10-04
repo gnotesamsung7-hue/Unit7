@@ -76,9 +76,16 @@ class MainActivity : Activity(), SensorEventListener {
         web.webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest) {
                 main.post {
-                    if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
-                        request.grant(request.resources)
-                    else request.deny()
+                    val ok = request.resources.filter {
+                        when (it) {
+                            PermissionRequest.RESOURCE_VIDEO_CAPTURE ->
+                                checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                            PermissionRequest.RESOURCE_AUDIO_CAPTURE ->
+                                checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                            else -> false
+                        }
+                    }
+                    if (ok.isNotEmpty()) request.grant(ok.toTypedArray()) else request.deny()
                 }
             }
         }
@@ -109,10 +116,9 @@ class MainActivity : Activity(), SensorEventListener {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 8) {
-            val ok = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
-            js("U7.onCameraPermission($ok)")
-        }
+        val ok = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+        if (requestCode == 8) js("U7.onCameraPermission && U7.onCameraPermission($ok)")
+        if (requestCode == 9) js("U7.onMicPermission && U7.onMicPermission($ok)")
     }
 
     private fun q(s: String): String = JSONObject.quote(s)
@@ -340,6 +346,7 @@ class MainActivity : Activity(), SensorEventListener {
             pendingTilt = false
             setTilt(true)
         }
+        js("U7.onResume && U7.onResume()")
     }
 
     override fun onDestroy() {
@@ -395,6 +402,15 @@ class MainActivity : Activity(), SensorEventListener {
         @JavascriptInterface
         fun askCamera() {
             main.post { requestPermissions(arrayOf(Manifest.permission.CAMERA), 8) }
+        }
+
+        @JavascriptInterface
+        fun hasMic(): Boolean =
+            checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+        @JavascriptInterface
+        fun askMic() {
+            main.post { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 9) }
         }
 
         @JavascriptInterface
