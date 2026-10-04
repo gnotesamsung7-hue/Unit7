@@ -1,4 +1,5 @@
 :root{
+  --i1:#ffe08a; --i2:#ffb21c; --i3:#b86a00; --glow:rgba(255,178,28,.55); --glow2:rgba(255,178,28,.95);
   --steel:#1b2329; --plate:#242f37; --rivet:#3a4852; --line:#33414b;
   --text:#ece6d6; --muted:#93a3ab; --amber:#ffb21c; --amber-deep:#b86a00;
   --red:#e0442f; --ok:#7fc29b;
@@ -31,7 +32,7 @@ h2{font:700 17px var(--cond);letter-spacing:.03em;margin:24px 0 10px;color:var(-
 .plate{fill:#11181d;stroke:var(--rivet);stroke-width:3}
 .rivet{fill:var(--rivet)}
 .ring{fill:#0b1013;stroke:#2c3942;stroke-width:3}
-.iris{fill:url(#iris);filter:drop-shadow(0 0 6px rgba(255,178,28,.55))}
+.iris{fill:url(#iris);filter:drop-shadow(0 0 6px var(--glow))}
 .pupil{fill:#1a1206}
 .glint{fill:#fff7de;opacity:.85}
 .eye .lid,.eye .look{transform-box:fill-box;transform-origin:center;transition:transform .18s ease}
@@ -51,7 +52,7 @@ h2{font:700 17px var(--cond);letter-spacing:.03em;margin:24px 0 10px;color:var(-
 
 .visor[data-mood=listen] .iris{animation:glow 1s ease-in-out infinite alternate}
 .visor[data-mood=listen] .lid{transform:scale(1.08)}
-@keyframes glow{from{filter:drop-shadow(0 0 4px rgba(255,178,28,.4))}to{filter:drop-shadow(0 0 14px rgba(255,178,28,.95))}}
+@keyframes glow{from{filter:drop-shadow(0 0 4px var(--glow))}to{filter:drop-shadow(0 0 14px var(--glow2))}}
 
 .visor[data-mood=happy] .lid{transform:scaleY(.42) translateY(-6%)}
 .visor[data-mood=worried] .lid{transform:scale(.78) translateY(8%)}
@@ -150,3 +151,47 @@ nav button.active{color:var(--amber)}
   padding:12px 14px;border-radius:12px;font-weight:600;font-size:14px;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none}
 .toast.show{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- two-phone setup ---------- */
+.eyes-tag{display:flex;align-items:center}
+.eyes-tag svg{width:30px;height:15px;fill:var(--rivet)}
+.eyes-tag.on svg{fill:var(--amber)}
+.role{position:fixed;inset:0;z-index:50;background:var(--steel);display:flex;align-items:center;justify-content:center;padding:24px}
+.role[hidden]{display:none}
+.role-in{width:100%;max-width:420px}
+.role h1{font:700 34px var(--cond);margin:0 0 4px}
+.role-btn{display:block;width:100%;text-align:left;padding:18px 20px;margin:12px 0;border-radius:18px;background:var(--plate);border:1px solid var(--line)}
+.role-btn strong{display:block;font:700 22px var(--cond);color:var(--amber);margin-bottom:4px}
+.role-btn span{color:var(--muted);font-size:15px}
+.role-btn:active{background:var(--rivet)}
+.eyes-hint{display:none}
+
+body.eyes-mode{background:#000}
+body.eyes-mode .top,body.eyes-mode nav,body.eyes-mode .tab>*:not(.visor),body.eyes-mode .toast{display:none!important}
+body.eyes-mode .app{padding:0}
+body.eyes-mode main{padding:0;overflow:hidden;display:flex;align-items:center;justify-content:center}
+body.eyes-mode #tab-home{display:flex!important;width:100%;height:100%;align-items:center;justify-content:center}
+body.eyes-mode .visor{max-width:none;width:96vw;max-height:94vh;margin:0}
+body.eyes-mode .visor svg{max-height:94vh}
+body.eyes-mode .plate{fill:#000;stroke:#0d1216}
+body.eyes-mode .rivet{fill:#141b20}
+body.eyes-mode .eyes-hint{display:block;position:fixed;left:0;right:0;bottom:12px;text-align:center;color:#556570;font-size:13px;transition:opacity 1s}
+body.eyes-mode .eyes-hint.gone{opacity:0}
+
+/* ---------- card moods ---------- */
+.visor[data-mood=angry] .lid{transform:scaleY(.5)}
+.visor[data-mood=angry] .e1 .lid,.visor[data-mood=angry] .e2 .lid{transform:scaleY(.5) rotate(10deg)}
+.visor[data-mood=angry] .e3 .lid,.visor[data-mood=angry] .e4 .lid{transform:scaleY(.5) rotate(-10deg)}
+.visor[data-mood=angry] .pupil{transform:scale(.7);transform-box:fill-box;transform-origin:center}
+.visor[data-mood=sad] .lid{transform:scaleY(.6) translateY(14%)}
+.visor[data-mood=sad] .look{transform:translateY(25%)}
+.visor[data-mood=party] .iris{animation:party 1.2s linear infinite}
+.visor[data-mood=party] .lid{animation:bob .5s ease-in-out infinite alternate}
+.visor[data-mood=party] .e2 .lid,.visor[data-mood=party] .e4 .lid{animation-delay:.25s}
+@keyframes party{from{filter:hue-rotate(0deg) drop-shadow(0 0 8px var(--glow))}to{filter:hue-rotate(360deg) drop-shadow(0 0 8px var(--glow))}}
+@keyframes bob{from{transform:translateY(-6%)}to{transform:translateY(6%)}}
+.visor[data-mood=seen] .lid{transform:scale(1.15)}
+
+.swatches{display:flex;flex-wrap:wrap;gap:10px}
+.swatches button{width:48px;height:48px;border-radius:50%;border:3px solid var(--line)}
+.swatches button[aria-pressed=true]{border-color:var(--text)}

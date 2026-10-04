@@ -12,6 +12,9 @@ import android.hardware.SensorManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.wifi.WifiManager
+import android.content.pm.ActivityInfo
+import android.view.View
 import android.os.BatteryManager
 import android.os.Bundle
 import android.os.Handler
@@ -25,10 +28,18 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
+import android.webkit.PermissionRequest
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.DatagramPacket
+import java.net.DatagramSocket
 import java.net.HttpURLConnection
+import java.net.Inet4Address
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.nio.ByteBuffer
 import java.net.URL
 import java.util.Locale
 import java.util.concurrent.Executors
@@ -62,6 +73,15 @@ class MainActivity : Activity(), SensorEventListener {
         web.settings.domStorageEnabled = true
         web.settings.mediaPlaybackRequiresUserGesture = false
         web.addJavascriptInterface(Bridge(), "Android")
+        web.webChromeClient = object : WebChromeClient() {
+            override fun onPermissionRequest(request: PermissionRequest) {
+                main.post {
+                    if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+                        request.grant(request.resources)
+                    else request.deny()
+                }
+            }
+        }
         setContentView(web)
         web.loadUrl("file:///android_asset/index.html")
 
@@ -84,6 +104,14 @@ class MainActivity : Activity(), SensorEventListener {
 
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 7)
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 8) {
+            val ok = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            js("U7.onCameraPermission($ok)")
         }
     }
 
@@ -184,6 +212,102 @@ class MainActivity : Activity(), SensorEventListener {
         }
     }
 
+    /* ---------- Phone-to-phone link (controller <-> eyes) over the robot's Wi-Fi ---------- */
+    private val LINK_PORT = 47007
+    @Volatile private var linkSock: DatagramSocket? = null
+    private var mlock: WifiManager.MulticastLock? = null
+
+    private fun startLink() {
+        if (linkSock != null) return
+        try {
+            val wm = applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
+            mlock = wm.createMulticastLock("unit7").apply { setReferenceCounted(false); acquire() }
+        } catch (e: Exception) {}
+        Thread {
+            try {
+                val s = DatagramSocket(null)
+                s.reuseAddress = true
+                s.broadcast = true
+                s.bind(InetSocketAddress(LINK_PORT))
+                linkSock = s
+                val buf = ByteArray(8192)
+                while (!s.isClosed) {
+                    val p = DatagramPacket(buf, buf.size)
+                    s.receive(p)
+                    val msg = String(p.data, 0, p.length, Charsets.UTF_8)
+                    val from = p.address?.hostAddress ?: ""
+                    js("U7.onLink(${q(msg)},${q(from)})")
+                }
+            } catch (e: Exception) {
+                linkSock = null
+            }
+        }.start()
+    }
+
+    private fun broadcastTargets(net: Network?): List<InetAddress> {
+        val out = mutableListOf<InetAddress>()
+        try {
+            val cm = getSystemService(ConnectivityManager::class.java)
+            val lp = if (net != null) cm?.getLinkProperties(net) else null
+            lp?.linkAddresses?.forEach { la ->
+                val a = la.address
+                if (a is Inet4Address) {
+                    val pre = la.prefixLength
+                    val ip = ByteBuffer.wrap(a.address).int
+                    val mask = if (pre == 0) 0 else (-1 shl (32 - pre))
+                    val b = ip or mask.inv()
+                    out.add(InetAddress.getByAddress(ByteBuffer.allocate(4).putInt(b).array()))
+                }
+            }
+        } catch (e: Exception) {}
+        out.add(InetAddress.getByName("255.255.255.255"))
+        return out
+    }
+
+    private fun linkSend(msg: String, to: String) {
+        io.execute {
+            try {
+                val net = wifiNetwork()
+                val ds = DatagramSocket()
+                ds.broadcast = true
+                try { net?.bindSocket(ds) } catch (e: Exception) {}
+                val data = msg.toByteArray(Charsets.UTF_8)
+                val targets = if (to.isNotEmpty()) listOf(InetAddress.getByName(to)) else broadcastTargets(net)
+                for (a in targets) {
+                    try { ds.send(DatagramPacket(data, data.size, a, LINK_PORT)) } catch (e: Exception) {}
+                }
+                ds.close()
+            } catch (e: Exception) {}
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun setEyesMode(on: Boolean) {
+        requestedOrientation = if (on) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                               else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        window.decorView.systemUiVisibility = if (on)
+            (View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+             View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION)
+            else View.SYSTEM_UI_FLAG_VISIBLE
+        if (on) {
+            window.statusBarColor = 0xFF000000.toInt()
+            window.navigationBarColor = 0xFF000000.toInt()
+            web.setBackgroundColor(0xFF000000.toInt())
+        } else {
+            window.statusBarColor = 0xFF1B2329.toInt()
+            window.navigationBarColor = 0xFF242F37.toInt()
+            web.setBackgroundColor(0xFF1B2329.toInt())
+            setBrightness(-1f)
+        }
+    }
+
+    private fun setBrightness(level: Float) {
+        val lp = window.attributes
+        lp.screenBrightness = level
+        window.attributes = lp
+    }
+
     override fun onSensorChanged(event: SensorEvent) {
         val now = System.currentTimeMillis()
         if (now - lastTiltPost < 40) return
@@ -219,6 +343,8 @@ class MainActivity : Activity(), SensorEventListener {
     }
 
     override fun onDestroy() {
+        try { linkSock?.close() } catch (e: Exception) {}
+        mlock?.release()
         recognizer?.destroy()
         tts?.shutdown()
         sensors.unregisterListener(this)
@@ -261,6 +387,27 @@ class MainActivity : Activity(), SensorEventListener {
         fun tilt(on: Boolean) {
             main.post { setTilt(on) }
         }
+
+        @JavascriptInterface
+        fun hasCamera(): Boolean =
+            checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+
+        @JavascriptInterface
+        fun askCamera() {
+            main.post { requestPermissions(arrayOf(Manifest.permission.CAMERA), 8) }
+        }
+
+        @JavascriptInterface
+        fun linkStart() { main.post { startLink() } }
+
+        @JavascriptInterface
+        fun linkSend(msg: String, to: String) { this@MainActivity.linkSend(msg, to) }
+
+        @JavascriptInterface
+        fun eyesMode(on: Boolean) { main.post { setEyesMode(on) } }
+
+        @JavascriptInterface
+        fun brightness(level: Float) { main.post { setBrightness(level) } }
 
         @JavascriptInterface
         fun battery(): Int {

@@ -9,5 +9,12 @@ with Chief (Voltnutt), Sparky and Whirr to the Origin Press.
 - **Legs tab:** move one leg at a time with sliders or tilt, balance assist, hop.
 - **Setup tab:** robot address, voice and tilt options.
 
-Connect the phone to the robot's Wi-Fi ("Robot - ...", password 12345678).
+**Two phones:** on first launch pick Controller (in your hand) or Eyes (mounted on the robot).
+The Eyes phone shows the four lens-eyes full screen and speaks for Unit 7. Hold its screen
+for 3 seconds to leave Eyes mode.
+
+**QR cards:** the Eyes phone watches through its front camera for Unit 7 cards
+(see Unit7_Cards_and_Guide.pdf) and reacts with eyes, voice and movement.
+
+Connect both phones to the robot's Wi-Fi ("Robot - ...", password 12345678).
 The APK is built by GitHub Actions: Actions tab → latest run → Unit7-apk.

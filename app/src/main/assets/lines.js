@@ -107,5 +107,22 @@ window.LINES = {
   batteryOk: [["happy", "Phone power at {n} percent. Plenty for work."]],
   batteryLow: [["worried", "[Joint creak] Phone power at {n} percent. Requesting a recharge and maybe a small rest."]],
   noLink: [["worried", "I can't reach my legs. Join the robot's Wi-Fi first."]],
-  count: [["busy", "{n}."]]
+  count: [["busy", "{n}."]],
+  eyesLinked: [
+    ["happy", "[Gyro whir] Eyes mounted. I can see where I'm going now."],
+    ["happy", "Optical unit attached. Four lenses, all pointing forward. Excellent."]
+  ],
+  cardParty: [["party", "[Gyro whir] Party card detected! Celebration protocol engaged. Sparky would be so proud."]],
+  cardOil: [["happy", "[Glug] Premium machine oil! My joints say thank you."]],
+  cardWake: [["happy", "[Gyro whir] Waking up. Systems green. Bolts tight."]],
+  cardHappy: [["happy", "[Leg tap] Happy card! Doing my happy shuffle."]],
+  cardScared: [["worried", "[Joint creak] That card is scary. Backing away slowly."]],
+  cardFierce: [["angry", "Fierce mode. I am a very dangerous maintenance crawler."]],
+  cardSad: [["sad", "[Joint creak] Sad card. I need to sit down for a moment."]],
+  cardCurious: [["think", "Curious. Scanning the area. Left… right…"]],
+  cardChief: [["happy", "[Leg tap] Chief! Unit 7 reporting for duty. All bolts checked."]],
+  cardColor: [["happy", "[Gyro whir] Lens colour changed to {c}."]],
+  cardAmber: [["happy", "[Gyro whir] Back to standard amber. Factory settings."]],
+  cardUnknown: [["think", "[Leg tap] That code isn't one of my cards."]],
+  eyesBatteryLow: [["worried", "[Joint creak] My eyes are at {n} percent power. Please charge the small phone soon."]]
 };
