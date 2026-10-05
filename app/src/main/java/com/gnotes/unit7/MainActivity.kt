@@ -138,7 +138,7 @@ class MainActivity : Activity(), SensorEventListener {
         }
     }
 
-    private fun doRequest(id: String, method: String, url: String) {
+    private fun doRequest(id: String, method: String, url: String, body: String = "") {
         var status = 0
         var body = ""
         try {
@@ -147,7 +147,13 @@ class MainActivity : Activity(), SensorEventListener {
             conn.requestMethod = method
             conn.connectTimeout = 1500
             conn.readTimeout = 3000
-            if (method == "POST") {
+            if (body.isNotEmpty()) {
+                val data = body.toByteArray(Charsets.UTF_8)
+                conn.doOutput = true
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.setFixedLengthStreamingMode(data.size)
+                conn.outputStream.use { it.write(data) }
+            } else if (method == "POST") {
                 conn.doOutput = true
                 conn.setFixedLengthStreamingMode(0)
                 conn.outputStream.close()
@@ -440,6 +446,11 @@ class MainActivity : Activity(), SensorEventListener {
         @JavascriptInterface
         fun request(id: String, method: String, url: String) {
             io.execute { doRequest(id, method, url) }
+        }
+
+        @JavascriptInterface
+        fun requestBody(id: String, method: String, url: String, body: String) {
+            io.execute { doRequest(id, method, url, body) }
         }
 
         @JavascriptInterface

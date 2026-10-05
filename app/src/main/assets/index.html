@@ -134,6 +134,31 @@
       <p class="note small" id="walkNote"></p>
 
       <button id="driveBtn" class="drive">Hold to drive</button>
+      <h2 id="hsTitle">High-step tuning</h2>
+      <div id="hsPanel" class="ctl hs" hidden>
+        <div class="row">
+          <label for="hsLift">Step height <output id="hsLiftOut"></output></label>
+          <input type="range" id="hsLift" min="20" max="55" step="1">
+          <div class="ends"><span>Low, steady</span><span>High, clears pebbles</span></div>
+        </div>
+        <div class="row">
+          <label for="hsBody">Body height <output id="hsBodyOut"></output></label>
+          <input type="range" id="hsBody" min="0" max="20" step="1">
+          <div class="ends"><span>Low</span><span>Tall</span></div>
+        </div>
+        <div class="row">
+          <label for="hsStride">Stride length <output id="hsStrideOut"></output></label>
+          <input type="range" id="hsStride" min="60" max="130" step="5">
+          <div class="ends"><span>Short, careful</span><span>Long, covers ground</span></div>
+        </div>
+        <div class="row">
+          <label for="hsSpeed">Top speed <output id="hsSpeedOut"></output></label>
+          <input type="range" id="hsSpeed" min="60" max="150" step="5">
+          <div class="ends"><span>Slow</span><span>Fast</span></div>
+        </div>
+        <label class="toggle"><input type="checkbox" id="hsCurve"><span>Curve while walking (tilt diagonally)</span></label>
+        <div class="btns"><button id="hsTest" class="btn">Test one step</button><button id="hsReset" class="btn">Reset</button></div>
+      </div>
     </section>
 
     <!-- LEGS -->
@@ -166,6 +191,27 @@
         <button id="legTiltBtn" class="btn primary">Move with tilt</button>
         <button id="standBtn" class="btn">Stand all</button>
         <button id="hopBtn" class="btn">Hop</button>
+      </div>
+
+      <h2>Calibrate legs</h2>
+      <div id="calIntro">
+        <p class="note">Calibration fixes legs that sit crooked or feet that don't touch the floor evenly. The trims are saved on the robot, so every app and every built-in move uses them.</p>
+        <button id="calStart" class="btn primary">Start calibrating</button>
+      </div>
+      <div id="calPanel" hidden>
+        <p class="note" id="calHint"></p>
+        <div class="seg" role="radiogroup" aria-label="Pose to check">
+          <button data-calpose="center" role="radio">Center pose</button>
+          <button data-calpose="stand" role="radio">Stand pose</button>
+        </div>
+        <div id="calRows" class="cal"></div>
+        <p class="note small" id="calStatus" aria-live="polite"></p>
+        <div class="btns">
+          <button id="calTest" class="btn">Test walk</button>
+          <button id="calUndo" class="btn">Undo changes</button>
+          <button id="calZero" class="btn">Zero all</button>
+          <button id="calDone" class="btn primary">Done</button>
+        </div>
       </div>
     </section>
 
@@ -270,5 +316,6 @@
 <script src="play.js"></script>
 <script src="head.js"></script>
 <script src="persona.js"></script>
+<script src="calib.js"></script>
 </body>
 </html>

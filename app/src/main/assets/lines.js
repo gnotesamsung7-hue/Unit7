@@ -172,5 +172,7 @@ window.LINES = {
   goldLocked: [["think", "Gold lenses unlock when I become a Senior Crawler."]],
   lonely: [["sad", "[Joint creak] Has anyone seen a Good Job card? Asking for a friend. The friend is me."]],
   wakeYes: [["listen", "Yes? Unit 7 listening."]],
+  calStart: [["think", "[Gyro whir] Calibration mode. I'll hold still while you adjust my legs. It tickles a little."]],
+  calDone: [["happy", "[Leg tap] Calibration saved. All four legs feel straighter already."]],
   eyesBatteryLow: [["worried", "[Joint creak] My eyes are at {n} percent power. Please charge the small phone soon."]]
 };

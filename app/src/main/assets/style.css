@@ -251,3 +251,23 @@ body.eyes-mode .eyes-hint.gone{opacity:0}
 @keyframes wobble{from{transform:rotate(-4deg)}to{transform:rotate(4deg)}}
 .cheeks ellipse{fill:#ff8f7d;opacity:0;transition:opacity .4s}
 .visor[data-mood=happy] .cheeks ellipse,.visor[data-mood=party] .cheeks ellipse,.visor[data-blush="1"] .cheeks ellipse{opacity:.6}
+
+.ctl.hs{margin:4px 0 16px;padding-bottom:12px}
+.ctl.hs[hidden]{display:none}
+.ctl.hs .toggle{border-top:1px solid var(--line);margin-top:4px}
+
+#tab-pilot .drive{margin-bottom:6px}
+
+/* ---------- calibration ---------- */
+#calPanel[hidden],#calIntro[hidden]{display:none}
+.cal{background:var(--plate);border:1px solid var(--line);border-radius:16px;margin:12px 0 6px;overflow:hidden}
+.cal-leg{padding:10px 14px}
+.cal-leg+.cal-leg{border-top:1px solid var(--line)}
+.cal-leg.sel{background:#2b3640}
+.cal-leg h3{margin:0 0 6px;font:700 16px var(--cond)}
+.cal-leg.sel h3{color:var(--amber)}
+.cal-row{display:grid;grid-template-columns:52px 1fr 54px 1fr;align-items:center;gap:8px;margin:6px 0}
+.cal-row span{color:var(--muted);font-size:13.5px}
+.cal-row button{min-height:44px;border-radius:12px;background:var(--steel);border:1px solid var(--line);font-weight:600;font-size:14px}
+.cal-row button:active{background:var(--rivet)}
+.cal-row output{text-align:center;font:700 18px var(--cond);color:var(--amber)}

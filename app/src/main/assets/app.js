@@ -84,21 +84,27 @@ const U7 = window.U7 = {
 
 /* ---------- Robot link ---------- */
 let lastQuiet = 0;
-async function req(method, path){
+async function req(method, path, body){
   const url = "http://" + P.base + path;
   if (window.countSteps && method === "POST" && path.startsWith("/api/v1/action?id=")) countSteps(+path.split("=")[1]);
   // Tell the Eyes phone the servos are about to make noise, so it doesn't mistake them for claps or waves.
   if (method === "POST" && path !== "/api/v1/stop" && P.role === "ctl" && S.eyes.linked && Date.now() - lastQuiet > 1000) {
     lastQuiet = Date.now(); linkSend({t:"quiet", ms:2500});
   }
+  if (method === "POST" && path.startsWith("/api/v1/stop")) S.maybeStale = true;
+  else if (method === "POST" && path.startsWith("/api/v1/action") && S.maybeStale && !S.clearing) await clearStaleStop();
   let r;
   if (HAS) {
     const id = "r" + (++rid);
-    r = await new Promise(res => { pending[id] = res; Android.request(id, method, url); });
+    r = await new Promise(res => {
+      pending[id] = res;
+      if (body && Android.requestBody) Android.requestBody(id, method, url, body); else Android.request(id, method, url);
+    });
   } else {
     try {
       const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 3000);
-      const f = await fetch(url, {method, signal: ctl.signal}); clearTimeout(t);
+      const f = await fetch(url, {method, signal: ctl.signal, body: body || undefined,
+        headers: body ? {"Content-Type": "application/json"} : undefined}); clearTimeout(t);
       r = {status: f.status, body: await f.text()};
     } catch(e) { r = {status: 0, body: ""}; }
   }
@@ -160,6 +166,20 @@ async function emergencyStop(silent){
   S.pos = null;
   setTimeout(refreshState, 300);
   if (!silent) say(pick("emergency"));
+}
+// A stop that arrives just after a move has finished stays pending in the firmware and
+// would swallow the next move. Before the next move, use it up with a harmless "stand".
+async function clearStaleStop(){
+  if (S.clearing) return;
+  S.clearing = true; S.maybeStale = false;
+  try {
+    const s = await refreshState();
+    if (s && s.stop_requested && !s.busy) {
+      await req("POST", "/api/v1/action?id=1");
+      S.pos = null;
+      await waitIdle(4000);
+    }
+  } finally { S.clearing = false; }
 }
 
 // Built-in actions block direct servo commands, so end any that is running.
@@ -540,8 +560,61 @@ function drawGauge(){
 }
 
 /* ---------- Pilot driving ---------- */
-function highStepFrame(fr){
-  return fr.map((v,i) => isLift(i) ? liftA(i, liftU(i,v) > 5 ? 38 : -8) : v);
+/* High-step tuning: step height, body height, stride, speed, and curving while walking. */
+const HS_DEFAULT = {hsLift: 38, hsBody: 8, hsStride: 100, hsSpeed: 100, hsCurve: true};
+const hs = k => P[k] ?? HS_DEFAULT[k];
+const SWING_SIDE = {};   // swing servo -> "L" or "R"
+Object.values(LEGS).forEach(L => { SWING_SIDE[L.swing] = L.flip < 0 ? "L" : "R"; });
+// steer: -1 curve left ... +1 curve right (shortens the stride on the inside of the curve)
+function highStepFrame(fr, steer){
+  const stride = hs("hsStride") / 100, st = steer || 0;
+  return fr.map((v,i) => {
+    if (isLift(i)) return liftA(i, liftU(i,v) > 5 ? hs("hsLift") : -hs("hsBody"));
+    let k = stride;
+    if (SWING_SIDE[i] === "L" && st < 0) k *= 1 + st * 0.75;
+    if (SWING_SIDE[i] === "R" && st > 0) k *= 1 - st * 0.75;
+    return clamp(Math.round(90 + (v - 90) * k), 40, 140);
+  });
+}
+// Move in three quick groups: raise feet together, swing together, lower together.
+async function applyPosePhased(target, tok){
+  const prev = S.pos ? S.pos.slice() : null;
+  const t = target.map((a,i) => Math.round(clampA(i,a)));
+  const ids = [0,1,2,3,4,5,6,7].filter(i => !prev || prev[i] !== t[i]);
+  const up = ids.filter(i => isLift(i) && (!prev || liftU(i, t[i]) > liftU(i, prev[i])));
+  const swing = ids.filter(i => !isLift(i));
+  const down = ids.filter(i => isLift(i) && !up.includes(i));
+  const pos = prev || new Array(8).fill(null);
+  for (const group of [up, swing, down]) {
+    if (tok !== undefined && tok !== S.token) { S.pos = pos.some(v => v == null) ? null : pos; return false; }
+    if (!group.length) continue;
+    await Promise.all(group.map(i => req("POST", "/api/v1/servo?servo=" + i + "&value=" + t[i])));
+    group.forEach(i => { pos[i] = t[i]; });
+  }
+  S.pos = t;
+  return true;
+}
+// Tilt for high-step: walk direction from forward/back tilt, with sideways tilt bending the path.
+function tiltHigh(){
+  const {fwd, left} = tiltVec(), dz = 8, full = 30;
+  const af = Math.abs(fwd), al = Math.abs(left);
+  if (af < dz && al < dz) return null;
+  if (af >= dz && hs("hsCurve")) {
+    const steer = al < dz ? 0 : clamp(-(left - Math.sign(left) * dz) / (full - dz), -1, 1);
+    return {dir: fwd > 0 ? "forward" : "backward", mag: clamp((af - dz) / (full - dz), 0, 1), steer};
+  }
+  return tiltDir();
+}
+const hsFrameMs = mag => Math.max(110, Math.round((460 - 290 * mag) * 100 / hs("hsSpeed")));
+async function highStepCycle(dir, steer, mag, tok, still){
+  for (const fr of GAIT[dir]) {
+    if (tok !== S.token || (still && !still())) return false;
+    const t0 = Date.now();
+    await applyPosePhased(highStepFrame(fr, dir === "backward" ? -steer : steer), tok);
+    const rest = hsFrameMs(typeof mag === "function" ? mag() : mag) - (Date.now() - t0);
+    if (rest > 0) await sleep(rest);
+  }
+  return true;
 }
 async function driveLoop(){
   const tok = ++S.token; S.driving = true; S.custom = null;
@@ -566,18 +639,14 @@ async function driveLoop(){
   } else {
     await makeRoom();
     while (S.driving && tok === S.token) {
-      const d = tiltDir(); drawGauge();
-      if (!d) { look(""); await applyPose(highStepFrame(STAND), tok); await sleep(100); continue; }
-      $("#statusLine").textContent = "High-stepping";
-      for (const fr of GAIT[d.dir]) {
-        if (!S.driving || tok !== S.token) break;
-        const dd = tiltDir(); if (!dd || dd.dir !== d.dir) break;
-        const ms = Math.round(440 - 260 * dd.mag), t0 = Date.now();
-        await applyPose(highStepFrame(fr), tok);
-        const rest = ms - (Date.now() - t0); if (rest > 0) await sleep(rest);
-      }
+      const d = tiltHigh(); drawGauge();
+      if (!d) { look(""); await applyPosePhased(highStepFrame(STAND), tok); await sleep(100); continue; }
+      look(d.steer < -0.3 || d.dir === "turnleft" ? "left" : d.steer > 0.3 || d.dir === "turnright" ? "right" : d.dir === "forward" ? "up" : "down");
+      $("#statusLine").textContent = "High-stepping" + (d.steer ? (d.steer < 0 ? ", curving left" : ", curving right") : "");
+      await highStepCycle(d.dir, d.steer || 0, () => { const x = tiltHigh(); return x ? x.mag : 0; }, tok,
+        () => { if (!S.driving) return false; const x = tiltHigh(); return !!x && x.dir === d.dir; });
     }
-    if (tok === S.token) await applyPose(STAND, tok);
+    if (tok === S.token) await applyPosePhased(highStepFrame(STAND), tok);
   }
   look(""); drawGauge(); renderStatus();
   if (tok === S.token && !S.listening) setMood("idle");
@@ -738,11 +807,34 @@ $("#hopBtn").addEventListener("click", () => { audio(); hop(); });
 
 function renderWalk(){
   $$("[data-walk]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.walk === P.walk)));
+  $("#hsPanel").hidden = P.walk !== "high";
+  $("#hsTitle").hidden = P.walk !== "high";
   $("#walkNote").textContent = P.walk === "builtin"
     ? "Smooth walking using the robot’s own steps. Tilt sets the direction."
-    : "Lifts feet higher to clear pebbles. Tilt further to walk faster.";
+    : "Lifts feet higher to clear pebbles. Tilt further to walk faster; tilt diagonally to curve.";
 }
 $$("[data-walk]").forEach(b => b.addEventListener("click", () => { P.walk = b.dataset.walk; savePrefs(); renderWalk(); }));
+
+/* High-step tuning panel */
+const HS_FIELDS = [["hsLift", "°"], ["hsBody", "°"], ["hsStride", "%"], ["hsSpeed", "%"]];
+function renderHs(){
+  for (const [k, unit] of HS_FIELDS) { $("#" + k).value = hs(k); $("#" + k + "Out").textContent = hs(k) + unit; }
+  $("#hsCurve").checked = !!hs("hsCurve");
+}
+for (const [k, unit] of HS_FIELDS) {
+  $("#" + k).addEventListener("input", e => { P[k] = +e.target.value; $("#" + k + "Out").textContent = P[k] + unit; savePrefs(); });
+}
+$("#hsCurve").addEventListener("change", e => { P.hsCurve = e.target.checked; savePrefs(); });
+$("#hsReset").addEventListener("click", () => { Object.keys(HS_DEFAULT).forEach(k => delete P[k]); savePrefs(); renderHs(); toast("High-step settings reset."); });
+$("#hsTest").addEventListener("click", async () => {
+  if (!S.online) { toast("Not connected. Join the robot’s Wi-Fi."); return; }
+  if (S.driving) return;
+  const tok = ++S.token; S.custom = "Test step"; renderStatus();
+  await makeRoom();
+  await highStepCycle("forward", 0, 0.5, tok);
+  if (tok === S.token) { await applyPosePhased(highStepFrame(STAND), tok); S.custom = null; renderStatus(); }
+});
+renderHs();
 
 function bindToggle(id, key){
   const el = $("#" + id); el.checked = !!P[key];
