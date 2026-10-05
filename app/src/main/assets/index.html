@@ -87,6 +87,15 @@
         <button id="logBtn" class="linkbtn">Story and maintenance log</button>
       </div>
 
+      <div class="explore">
+        <div>
+          <strong>Explore mode</strong>
+          <span id="exploreState">Off</span>
+          <p class="note small">For a new place: he wanders on his own, steers around obstacles with his sensor, and says hello to new people.</p>
+        </div>
+        <button id="exploreBtn" class="switch" role="switch" aria-checked="false" aria-label="Explore mode"><span></span></button>
+      </div>
+
       <h2>Games</h2>
       <div class="chips">
         <button data-game="quiz">Colour Quiz</button>
@@ -111,37 +120,38 @@
 
     <!-- PILOT -->
     <section id="tab-pilot" class="tab">
-      <p class="note">Hold the drive button and tilt the phone. Tilt away to walk forward, toward you to back up, sideways to turn. How you hold the phone when you press is “level”.</p>
+      <p class="note" id="pilotNote"></p>
 
       <div class="gauge">
         <svg viewBox="0 0 200 200" aria-hidden="true">
           <circle class="g-out" cx="100" cy="100" r="92"/>
           <circle class="g-dead" cx="100" cy="100" r="25"/>
           <path class="g-cross" d="M100 14v172M14 100h172"/>
-          <text x="100" y="32" class="g-lab">Forward</text>
-          <text x="100" y="180" class="g-lab">Back</text>
-          <text x="30" y="104" class="g-lab">Left</text>
-          <text x="170" y="104" class="g-lab">Right</text>
+          <text x="100" y="32" class="g-lab" id="gTop">Forward</text>
+          <text x="100" y="180" class="g-lab" id="gBottom">Back</text>
+          <text x="34" y="104" class="g-lab" id="gLeft">Left</text>
+          <text x="166" y="104" class="g-lab" id="gRight">Right</text>
           <circle id="gDot" class="g-dot" cx="100" cy="100" r="13"/>
         </svg>
         <p id="gText" class="g-text">Tilt sensor starting…</p>
       </div>
 
       <div class="seg" role="radiogroup" aria-label="Walking style">
-        <button data-walk="builtin" role="radio">Normal walk</button>
+        <button data-walk="normal" role="radio">Normal</button>
         <button data-walk="high" role="radio">High-step</button>
+        <button data-walk="builtin" role="radio">Robot’s own</button>
       </div>
       <p class="note small" id="walkNote"></p>
 
       <button id="driveBtn" class="drive">Hold to drive</button>
       <h2 id="hsTitle">High-step tuning</h2>
       <div id="hsPanel" class="ctl hs" hidden>
-        <div class="row">
+        <div class="row hs-high">
           <label for="hsLift">Step height <output id="hsLiftOut"></output></label>
           <input type="range" id="hsLift" min="20" max="55" step="1">
           <div class="ends"><span>Low, steady</span><span>High, clears pebbles</span></div>
         </div>
-        <div class="row">
+        <div class="row hs-high">
           <label for="hsBody">Body height <output id="hsBodyOut"></output></label>
           <input type="range" id="hsBody" min="0" max="20" step="1">
           <div class="ends"><span>Low</span><span>Tall</span></div>
@@ -233,6 +243,11 @@
       <label class="toggle"><input type="checkbox" id="pIdleMoves"><span>Idle moves: bolt checks and stretches in place</span></label>
       <label class="toggle"><input type="checkbox" id="pWander"><span>Let him wander: small turns when he's curious</span></label>
 
+      <h2>People he has met</h2>
+      <div id="peopleList"></div>
+      <button id="forgetAll" class="btn">Forget everyone</button>
+      <p class="note small">Faces are stored as numbers on this phone only, and only for people who said yes.</p>
+
       <h2>Robot</h2>
       <p class="note">Join the robot’s Wi-Fi (“Robot - …”, password 12345678), then come back here.</p>
       <div class="field">
@@ -255,12 +270,16 @@
       <h2>Voice</h2>
       <label class="toggle"><input type="checkbox" id="pTalk"><span>Unit 7 speaks out loud</span></label>
       <label class="toggle"><input type="checkbox" id="pSfx"><span>Sound effects (leg taps, gyro whirs)</span></label>
-      <label class="toggle"><input type="checkbox" id="pWake"><span>Hands-free: listen for “Hey Unit 7”</span></label>
-      <p class="note small">Keeps the microphone on and uses more battery. Some phones beep each time listening restarts.</p>
+      <p class="note">This phone always listens for “Hey Unit 7”. Say it, then your command, for example “Hey Unit 7, dance”. The microphone button still works too.</p>
+      <p class="note small">Listening uses some extra battery, and some phones beep each time listening restarts.</p>
       <label class="toggle"><input type="checkbox" id="pOffline"><span>Prefer offline speech recognition</span></label>
       <p class="note small">On the robot’s Wi-Fi there’s no internet. Offline recognition needs the English offline pack: Settings › Google › Voice › Offline speech recognition. If voice stops working, turn this off to use mobile data instead.</p>
 
       <h2>Tilt</h2>
+      <div class="seg" role="radiogroup" aria-label="Tilt layout">
+        <button data-tilt="side" role="radio">Tip left = forward</button>
+        <button data-tilt="classic" role="radio">Tilt away = forward</button>
+      </div>
       <label class="toggle"><input type="checkbox" id="pFlip"><span>Flip phone face-down to stop</span></label>
       <label class="toggle"><input type="checkbox" id="pInvF"><span>Swap forward and back</span></label>
       <label class="toggle"><input type="checkbox" id="pInvT"><span>Swap left and right</span></label>
@@ -317,5 +336,6 @@
 <script src="head.js"></script>
 <script src="persona.js"></script>
 <script src="calib.js"></script>
+<script src="explore.js"></script>
 </body>
 </html>

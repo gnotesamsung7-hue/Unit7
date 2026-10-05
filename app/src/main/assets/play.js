@@ -350,26 +350,31 @@ function playExecute(c){
 const WAKE_RE = /(hey |hi |hello |ok |a )?(unit|you knit|unit's|unix) ?(7|seven|set)\b/;
 const GREET_RE = /^\s*(hello|hi)( there)?( (unit|you knit) ?(7|seven))?\s*$/;
 let wakeArmed = 0, wakeT = null;
+// The controller phone always listens for "Hey Unit 7" (unless the microphone isn't available).
+const wakeOn = () => P.role === "ctl" && HAS && !S.micBlocked;
 function wakeListen(delay){
   clearTimeout(wakeT);
   wakeT = setTimeout(() => {
-    if (!P.wake || !HAS || P.role !== "ctl" || S.listening || document.hidden) return;
+    if (!wakeOn() || S.listening || document.hidden) return;
+    if (S.speaking) { wakeListen(700); return; }   // don't listen to his own voice
     S.wakeListening = true;
     Android.listen(!!P.offline);
   }, delay || 400);
 }
-function wakeResume(){ if (P.wake) wakeListen(800); }
+function wakeResume(){ if (wakeOn()) wakeListen(800); }
 function wakeHeard(kind, data){
   if (kind === "ready" || kind === "end") return;
   if (kind === "partial") { if (data && data[0]) $("#heard").textContent = "…" + data[0]; return; }
   S.wakeListening = false;
   if (kind === "error") {
     const code = String(data);
-    if (code === "9" || code === "mic-permission" || code === "no-recognizer") { P.wake = false; savePrefs(); $("#pWake").checked = false; toast("Hands-free listening needs microphone access and a speech service."); return; }
+    if (code === "9" || code === "mic-permission" || code === "no-recognizer") { S.micBlocked = true; toast("“Hey Unit 7” needs microphone access and a speech service on this phone."); return; }
     wakeListen(code === "8" ? 1500 : 400);
     return;
   }
   const list = (data || []).map(x => String(x).toLowerCase());
+  // Ignore anything heard while Unit 7 was talking (he says his own name a lot).
+  if (S.speaking || Date.now() - (S.spokeAt || 0) < 1000) { wakeListen(400); return; }
   if (window.personaAsking && personaAsking() && list.length) {
     $("#heard").textContent = "You: " + list[0]; execute(parse(list[0])); wakeListen(400); return;
   }
@@ -398,15 +403,13 @@ function playInit(){
   $("#endGameBtn").addEventListener("click", () => endGame(false));
   $$("[data-game]").forEach(b => b.addEventListener("click", () => { audio(); startGame(b.dataset.game); }));
   $("#followBtn").addEventListener("click", () => { audio(); if (FOLLOW.on) { emergencyStop(true); } else { say(pick("followStart")); follow("follow"); } });
-  const w = $("#pWake"); w.checked = !!P.wake;
-  w.addEventListener("change", () => { P.wake = w.checked; savePrefs(); if (P.wake) wakeListen(300); else if (S.wakeListening && HAS) { S.wakeListening = false; Android.stopListening(); } });
   const li = $("#pLightInv"); li.checked = !!P.lightInv;
   li.addEventListener("change", () => { P.lightInv = li.checked; savePrefs(); });
   const prevResume = U7.onResume;
-  U7.onResume = () => { if (prevResume) prevResume(); if (P.wake) wakeListen(600); };
+  U7.onResume = () => { if (prevResume) prevResume(); S.micBlocked = false; if (wakeOn()) wakeListen(600); };
   if (P.role === "ctl") {
     sendHappy();
-    if (P.wake) wakeListen(2500);
+    if (wakeOn()) wakeListen(2500);
     setInterval(() => {   // a lonely Unit 7 asks for attention now and then
       decay();
       if (ST.happy < 30 && !GAME.on && !busyNow() && Date.now() - ST.last > 5 * 60000 && !S.listening) say(pick("lonely"));

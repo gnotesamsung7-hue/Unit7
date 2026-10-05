@@ -52,9 +52,10 @@ function clampA(i,a){
 
 /* ---------- Preferences ---------- */
 const DEFAULTS = {base:"192.168.4.1", talk:true, sfx:true, offline:true, flipStop:true,
-  invF:false, invT:false, walk:"builtin", balance:true, role:null, eyesAddr:"", color:"amber", wake:false, lightInv:false};
+  invF:false, invT:false, walk:"normal", tiltLayout:"side", balance:true, role:null, eyesAddr:"", color:"amber", wake:false, lightInv:false};
 const P = Object.assign({}, DEFAULTS, (() => { try { return JSON.parse(localStorage.getItem("u7.prefs")) || {}; } catch(e){ return {}; } })());
 const savePrefs = () => { try { localStorage.setItem("u7.prefs", JSON.stringify(P)); } catch(e){} };
+if (!P.v2tilt) { P.v2tilt = 1; if (P.walk === "builtin") P.walk = "normal"; P.tiltLayout = "side"; savePrefs(); }
 
 /* ---------- State ---------- */
 const S = {
@@ -227,7 +228,8 @@ function say(line){
   sayChain = sayChain.then(() => tok === sayTok ? doSay(line, tok) : null).catch(() => {});
   return sayChain;
 }
-function hush(){ sayTok++; $("#visor").dataset.talking = ""; if (P.role === "ctl" && S.eyes.linked) linkSend({t:"hush"}); if (HAS) Android.stopSpeaking(); Object.keys(spoken).forEach(k => U7.onSpoken(k)); }
+function hush(){ sayTok++; $("#visor").dataset.talking = "";
+  if (typeof saidWait !== "undefined") Object.keys(saidWait).forEach(k => { const f = saidWait[k]; delete saidWait[k]; f(); }); if (P.role === "ctl" && S.eyes.linked) linkSend({t:"hush"}); if (HAS) Android.stopSpeaking(); Object.keys(spoken).forEach(k => U7.onSpoken(k)); }
 async function doSay({mood, text, vol}, tok){
   if (P.role === "ctl" && S.eyes.linked && S.eyes.kind !== "head") return remoteSay({mood, text}, tok);
   setMood(mood);
@@ -509,6 +511,7 @@ function heard(kind, data){
   // errors
   const code = String(data);
   setMood("idle");
+  if (isEyes() && !S.ctlAsleep && S.ctlIp) { linkSend({t:"heard", list: [], err: code, to: S.ctlIp}); return; }
   if (window.wakeResume) wakeResume();
   if (code === "7" || code === "6") { $("#heard").textContent = ""; say(pick("didntHear")); }
   else if (code === "mic-permission" || code === "9") toast("Allow microphone access for Unit 7, then try again.");
@@ -532,9 +535,17 @@ function tiltIn(p, r, z){
   drawGauge();
   if (S.legTilt) legTiltTick();
 }
-function tiltVec(){
+// Physical tilt since "level": fwd = top edge away from you, left = tipped to the left.
+function tiltRaw(){
   const T = S.tilt;
-  let fwd = T.p - T.p0, left = T.r - T.r0;
+  return {fwd: T.p - T.p0, left: T.r - T.r0};
+}
+// Tilt as driving commands. Sideways layout: tip left to walk forward, right to back up,
+// top edge away/toward you to turn right/left. Classic: away = forward, sideways = turn.
+function tiltVec(){
+  const r = tiltRaw();
+  let fwd = r.fwd, left = r.left;
+  if (P.tiltLayout === "side") { fwd = r.left; left = -r.fwd; }
   if (P.invF) fwd = -fwd;
   if (P.invT) left = -left;
   return {fwd, left};
@@ -548,14 +559,16 @@ function tiltDir(){
 }
 function drawGauge(){
   if (S.tab !== "pilot") return;
-  const {fwd, left} = tiltVec();
+  const {fwd, left} = tiltRaw();
   const x = 100 - clamp(left, -35, 35) / 35 * 78, y = 100 - clamp(fwd, -35, 35) / 35 * 78;
   const dot = $("#gDot"); dot.setAttribute("cx", x.toFixed(1)); dot.setAttribute("cy", y.toFixed(1));
-  const d = tiltDir();
+  const d = P.walk === "builtin" ? tiltDir() : tiltHigh();
   dot.classList.toggle("go", !!(d && S.driving));
   const names = {forward:"Forward", backward:"Back", turnleft:"Turn left", turnright:"Turn right"};
   $("#gText").textContent = !S.tilt.live ? "Tilt sensor starting…" :
-    d ? names[d.dir] + (P.walk === "high" ? " · speed " + Math.round(30 + 70 * d.mag) + "%" : "") + (S.driving ? "" : " (hold drive to go)")
+    d ? names[d.dir] + (d.steer ? (d.steer < 0 ? ", curving left" : ", curving right") : "") +
+        (P.walk !== "builtin" && (d.dir === "forward" || d.dir === "backward") ? " · speed " + Math.round(25 + 75 * d.mag) + "%" : "") +
+        (S.driving ? "" : " (hold drive to go)")
       : "Level";
 }
 
@@ -567,9 +580,9 @@ const SWING_SIDE = {};   // swing servo -> "L" or "R"
 Object.values(LEGS).forEach(L => { SWING_SIDE[L.swing] = L.flip < 0 ? "L" : "R"; });
 // steer: -1 curve left ... +1 curve right (shortens the stride on the inside of the curve)
 function highStepFrame(fr, steer){
-  const stride = hs("hsStride") / 100, st = steer || 0;
+  const stride = hs("hsStride") / 100, st = steer || 0, high = P.walk === "high";
   return fr.map((v,i) => {
-    if (isLift(i)) return liftA(i, liftU(i,v) > 5 ? hs("hsLift") : -hs("hsBody"));
+    if (isLift(i)) return high ? liftA(i, liftU(i,v) > 5 ? hs("hsLift") : -hs("hsBody")) : liftA(i, liftU(i,v) > 5 ? 22 : 0);
     let k = stride;
     if (SWING_SIDE[i] === "L" && st < 0) k *= 1 + st * 0.75;
     if (SWING_SIDE[i] === "R" && st > 0) k *= 1 - st * 0.75;
@@ -605,7 +618,10 @@ function tiltHigh(){
   }
   return tiltDir();
 }
-const hsFrameMs = mag => Math.max(110, Math.round((460 - 290 * mag) * 100 / hs("hsSpeed")));
+// Bigger tilt = shorter pause per step frame = faster walking.
+const hsFrameMs = mag => P.walk === "high"
+  ? Math.max(110, Math.round((460 - 290 * mag) * 100 / hs("hsSpeed")))
+  : Math.max(80, Math.round((420 - 330 * mag) * 100 / hs("hsSpeed")));
 async function highStepCycle(dir, steer, mag, tok, still){
   for (const fr of GAIT[dir]) {
     if (tok !== S.token || (still && !still())) return false;
@@ -642,7 +658,7 @@ async function driveLoop(){
       const d = tiltHigh(); drawGauge();
       if (!d) { look(""); await applyPosePhased(highStepFrame(STAND), tok); await sleep(100); continue; }
       look(d.steer < -0.3 || d.dir === "turnleft" ? "left" : d.steer > 0.3 || d.dir === "turnright" ? "right" : d.dir === "forward" ? "up" : "down");
-      $("#statusLine").textContent = "High-stepping" + (d.steer ? (d.steer < 0 ? ", curving left" : ", curving right") : "");
+      $("#statusLine").textContent = (P.walk === "high" ? "High-stepping" : "Walking") + (d.steer ? (d.steer < 0 ? ", curving left" : ", curving right") : "");
       await highStepCycle(d.dir, d.steer || 0, () => { const x = tiltHigh(); return x ? x.mag : 0; }, tok,
         () => { if (!S.driving) return false; const x = tiltHigh(); return !!x && x.dir === d.dir; });
     }
@@ -726,7 +742,7 @@ function sendLegFromSliders(){
 function drawSpiderFrom(p){ const keep = S.pos; S.pos = p; drawSpider(); S.pos = keep; }
 let legTiltLast = null;
 function legTiltTick(){
-  const {fwd, left} = tiltVec();
+  const {fwd, left} = tiltRaw();
   const lift = Math.round(clamp(fwd * 1.6, -25, 55));
   const swing = Math.round(clamp(90 - left * 1.6, 40, 140));
   if (legTiltLast && Math.abs(legTiltLast[0] - lift) < 3 && Math.abs(legTiltLast[1] - swing) < 3) return;
@@ -807,11 +823,15 @@ $("#hopBtn").addEventListener("click", () => { audio(); hop(); });
 
 function renderWalk(){
   $$("[data-walk]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.walk === P.walk)));
-  $("#hsPanel").hidden = P.walk !== "high";
-  $("#hsTitle").hidden = P.walk !== "high";
+  $("#hsPanel").hidden = P.walk === "builtin";
+  $("#hsTitle").hidden = P.walk === "builtin";
+  $("#hsTitle").textContent = P.walk === "high" ? "High-step tuning" : "Walk tuning";
+  $$(".hs-high").forEach(el => { el.hidden = P.walk !== "high"; });
+  renderTiltHelp();
   $("#walkNote").textContent = P.walk === "builtin"
-    ? "Smooth walking using the robot’s own steps. Tilt sets the direction."
-    : "Lifts feet higher to clear pebbles. Tilt further to walk faster; tilt diagonally to curve.";
+    ? "The robot’s own walk: smooth, one fixed speed. Tilt sets the direction."
+    : P.walk === "high" ? "Lifts feet higher to clear pebbles. Tilt further to walk faster; tilt diagonally to curve."
+    : "Everyday walking. Tilt further to walk faster; tilt diagonally to curve.";
 }
 $$("[data-walk]").forEach(b => b.addEventListener("click", () => { P.walk = b.dataset.walk; savePrefs(); renderWalk(); }));
 
@@ -836,6 +856,16 @@ $("#hsTest").addEventListener("click", async () => {
 });
 renderHs();
 
+function renderTiltHelp(){
+  const side = P.tiltLayout === "side";
+  $("#pilotNote").textContent = side
+    ? "Hold the drive button and tip the phone to the left to walk forward. The further you tip it, the faster he goes. Tip right to back up; tilt the top edge away or toward you to turn. How you hold the phone when you press is “level”."
+    : "Hold the drive button and tilt the phone. Tilt away to walk forward, toward you to back up, sideways to turn. How you hold the phone when you press is “level”.";
+  const L = side ? ["Turn right", "Turn left", "Forward", "Back"] : ["Forward", "Back", "Left", "Right"];
+  ["#gTop", "#gBottom", "#gLeft", "#gRight"].forEach((id, i) => { $(id).textContent = L[i]; });
+  $$("[data-tilt]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.tilt === P.tiltLayout)));
+}
+$$("[data-tilt]").forEach(b => b.addEventListener("click", () => { P.tiltLayout = b.dataset.tilt; savePrefs(); renderTiltHelp(); drawGauge(); }));
 function bindToggle(id, key){
   const el = $("#" + id); el.checked = !!P[key];
   el.addEventListener("change", () => { P[key] = el.checked; savePrefs(); drawGauge(); });
@@ -865,12 +895,12 @@ async function remoteSay({mood, text}, tok){
     .replace(/\[(.+?)\]/g, '<span class="tic">[$1]</span>');
   const id = MY_ID + "-" + (++remoteId);
   linkSend({t:"say", id, mood, text, talk:P.talk, sfx:P.sfx, vol: S.whisper ? 0.35 : 1});
-  $("#visor").dataset.talking = "1";
+  $("#visor").dataset.talking = "1"; S.speaking = true;
   await new Promise(res => {
     const t = setTimeout(() => { delete saidWait[id]; res(); }, Math.max(3500, text.length * 110));
     saidWait[id] = () => { clearTimeout(t); res(); };
   });
-  $("#visor").dataset.talking = "";
+  $("#visor").dataset.talking = ""; S.speaking = false; S.spokeAt = Date.now();
   if (tok === sayTok && !S.listening) setMood(restMood());
 }
 function linkIn(raw, from){
@@ -1089,6 +1119,7 @@ async function startScanner(){
   setInterval(() => {
     if (!v.videoWidth || scan.busy) return;
     if (window.senseFrame) senseFrame(v);
+    if (window.faceTick && tick % 3 === 0) faceTick(v);
     if ((++tick) % 2) return;
     const w = 400, h = Math.round(w * v.videoHeight / v.videoWidth);
     cv.width = w; cv.height = h;

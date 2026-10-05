@@ -23,5 +23,9 @@ Hide and Seek, Treasure Hunt), encourage points with ranks, and hands-free "Hey 
 covered or left in the dark, memory of your name and favourites, the story of the missing
 Units 1-6 with a maintenance log, jokes and conversation, and bravery/curiosity that grow.
 
+**Explore mode:** for a new place. He wanders using the robot's obstacle-avoid walk, spots faces
+through the Palm, asks new people their name, asks before remembering their face, checks if
+they're scared of him and tells a joke. Face model: see NOTICE.md.
+
 Connect both phones to the robot's Wi-Fi ("Robot - ...", password 12345678).
 The APK is built by GitHub Actions: Actions tab → latest run → Unit7-apk.

@@ -159,7 +159,7 @@ function renderTraits(){
   if (c) c.style.width = ST.curious + "%";
 }
 // Rank flavours his way of speaking: nervous as a trainee, confident as Chief Engineer.
-const NO_FLAVOUR = /^(count|quiz|copy|hunt|seek|clap|body)/;
+const NO_FLAVOUR = /^(count|quiz|copy|hunt|seek|clap|body|meet|greet|explore|people|cal)/;
 function flavour(text, key){
   if (NO_FLAVOUR.test(key || "") || text.length < 20 || text.startsWith("[") || Math.random() > 0.25) return text;
   const r = rankIdx();
@@ -274,7 +274,7 @@ function askQuestion(){
   ST.asked[kind] = Date.now(); saveStats();
   ASK.kind = kind; ASK.until = Date.now() + 20000;
   say(pick("ask_" + kind));
-  if (P.wake && window.wakeListen) wakeListen(2500);
+  if (window.wakeOn && wakeOn()) wakeListen(2500);
   return true;
 }
 function answer(t){

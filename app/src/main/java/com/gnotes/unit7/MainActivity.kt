@@ -17,6 +17,17 @@ import android.content.pm.ActivityInfo
 import android.view.View
 import android.os.BatteryManager
 import android.util.Base64
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Rect
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.FaceDetection
+import com.google.mlkit.vision.face.FaceDetector
+import com.google.mlkit.vision.face.FaceDetectorOptions
+import org.tensorflow.lite.Interpreter
+import java.io.FileInputStream
+import java.nio.ByteOrder
+import java.nio.channels.FileChannel
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -166,6 +177,106 @@ class MainActivity : Activity(), SensorEventListener {
             status = 0
         }
         js("U7.onResponse(${q(id)},$status,${q(body)})")
+    }
+
+    /* ---------- Faces: ML Kit finds them, FaceNet turns each into 128 numbers to recognise later ---------- */
+    private var faceDetector: FaceDetector? = null
+    private var faceNet: Interpreter? = null
+    private var faceNetFailed = false
+
+    private fun detector(): FaceDetector {
+        faceDetector?.let { return it }
+        val d = FaceDetection.getClient(
+            FaceDetectorOptions.Builder()
+                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                .setMinFaceSize(0.12f)
+                .build())
+        faceDetector = d
+        return d
+    }
+
+    @Synchronized
+    private fun loadFaceNet(): Interpreter? {
+        if (faceNet != null || faceNetFailed) return faceNet
+        try {
+            val fd = assets.openFd("facenet.tflite")
+            val map = FileInputStream(fd.fileDescriptor).channel
+                .map(FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.declaredLength)
+            faceNet = Interpreter(map, Interpreter.Options().setNumThreads(4))
+        } catch (e: Exception) {
+            faceNetFailed = true
+        }
+        return faceNet
+    }
+
+    private fun embedFace(bmp: Bitmap, box: Rect): FloatArray? {
+        val net = loadFaceNet() ?: return null
+        val m = (box.width() * 0.1f).toInt()
+        val l = (box.left - m).coerceAtLeast(0)
+        val t = (box.top - m).coerceAtLeast(0)
+        val r = (box.right + m).coerceAtMost(bmp.width)
+        val b = (box.bottom + m).coerceAtMost(bmp.height)
+        if (r - l < 24 || b - t < 24) return null
+        val face = Bitmap.createScaledBitmap(Bitmap.createBitmap(bmp, l, t, r - l, b - t), 160, 160, true)
+        val px = IntArray(160 * 160)
+        face.getPixels(px, 0, 160, 0, 0, 160, 160)
+        val vals = FloatArray(px.size * 3)
+        var k = 0
+        for (p in px) {
+            vals[k++] = ((p shr 16) and 0xFF).toFloat()
+            vals[k++] = ((p shr 8) and 0xFF).toFloat()
+            vals[k++] = (p and 0xFF).toFloat()
+        }
+        var mean = 0.0
+        for (v in vals) mean += v
+        mean /= vals.size
+        var sq = 0.0
+        for (v in vals) { val d = v - mean; sq += d * d }
+        val std = maxOf(Math.sqrt(sq / vals.size), 1.0 / Math.sqrt(vals.size.toDouble()))
+        val buf = ByteBuffer.allocateDirect(vals.size * 4).order(ByteOrder.nativeOrder())
+        for (v in vals) buf.putFloat(((v - mean) / std).toFloat())
+        buf.rewind()
+        val out = Array(1) { FloatArray(128) }
+        synchronized(net) { net.run(buf, out) }
+        val e = out[0]
+        var n = 0.0
+        for (v in e) n += v * v
+        val len = Math.sqrt(n).toFloat()
+        if (len > 0f) for (i in e.indices) e[i] = e[i] / len
+        return e
+    }
+
+    private fun doDetectFaces(id: String, dataUrl: String, withEmbedding: Boolean) {
+        try {
+            val bytes = Base64.decode(dataUrl.substringAfter(','), Base64.DEFAULT)
+            val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            if (bmp == null) { js("U7.onFaces(${q(id)},[])"); return }
+            detector().process(InputImage.fromBitmap(bmp, 0))
+                .addOnSuccessListener(io) { faces ->
+                    val arr = JSONArray()
+                    val sorted = faces.sortedByDescending { it.boundingBox.width() * it.boundingBox.height() }
+                    for ((idx, f) in sorted.take(3).withIndex()) {
+                        val bb = f.boundingBox
+                        val o = JSONObject()
+                        o.put("x", (bb.centerX().toDouble() / bmp.width) * 2 - 1)
+                        o.put("w", bb.width().toDouble() / bmp.width)
+                        o.put("h", bb.height().toDouble() / bmp.height)
+                        if (idx == 0 && withEmbedding && bb.width() > bmp.width * 0.1) {
+                            val e = embedFace(bmp, bb)
+                            if (e != null) {
+                                val ja = JSONArray()
+                                for (v in e) ja.put(Math.round(v * 10000.0) / 10000.0)
+                                o.put("emb", ja)
+                            }
+                        }
+                        arr.put(o)
+                    }
+                    js("U7.onFaces(${q(id)},$arr)")
+                }
+                .addOnFailureListener(io) { js("U7.onFaces(${q(id)},[])") }
+        } catch (e: Exception) {
+            js("U7.onFaces(${q(id)},[])")
+        }
     }
 
     /** Fetch a camera snapshot from Unit 7's head and hand it to the page as a data URL. */
@@ -434,6 +545,8 @@ class MainActivity : Activity(), SensorEventListener {
     override fun onDestroy() {
         try { linkSock?.close() } catch (e: Exception) {}
         mlock?.release()
+        faceDetector?.close()
+        faceNet?.close()
         recognizer?.destroy()
         tts?.shutdown()
         sensors.unregisterListener(this)
@@ -451,6 +564,11 @@ class MainActivity : Activity(), SensorEventListener {
         @JavascriptInterface
         fun requestBody(id: String, method: String, url: String, body: String) {
             io.execute { doRequest(id, method, url, body) }
+        }
+
+        @JavascriptInterface
+        fun detectFaces(id: String, dataUrl: String, withEmbedding: Boolean) {
+            io.execute { doDetectFaces(id, dataUrl, withEmbedding) }
         }
 
         @JavascriptInterface

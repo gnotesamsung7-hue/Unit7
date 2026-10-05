@@ -133,6 +133,8 @@ function clapHeard(n){
 
 /* ---------- Messages from the controller ---------- */
 function senseLink(m){
+  if (m.t === "explore") { FACES.on = !!m.on; return; }
+  if (m.t === "listen") { if (!S.listening) startListen(); return; }
   if (m.t === "follow") { SENSE.follow = !!m.on; if (!m.on) $("#visor").dataset.look = ""; }
   else if (m.t === "game") SENSE.game = !!m.on;
   else if (m.t === "quiet") SENSE.quietUntil = Date.now() + (m.ms || 2500);
@@ -233,4 +235,29 @@ function startBody(){
     if (BODY.charging !== null && c !== BODY.charging) bodyEvent(c ? "charging" : "unplugged");
     BODY.charging = c;
   }, 10000);
+}
+
+/* ---------- Faces (Explore mode): find people and send their face fingerprint to the controller ---------- */
+const FACES = {on: false, busy: false, id: 0, pending: {}, cv: null};
+U7.onFaces = (id, arr) => { const f = FACES.pending[id]; if (f) { delete FACES.pending[id]; f(arr || []); } };
+function faceTick(video){
+  if (!FACES.on || FACES.busy || !HAS || !Android.detectFaces || !video.videoWidth) return;
+  FACES.busy = true;
+  if (!FACES.cv) FACES.cv = document.createElement("canvas");
+  const w = 320, h = Math.round(w * video.videoHeight / video.videoWidth);
+  FACES.cv.width = w; FACES.cv.height = h;
+  FACES.cv.getContext("2d").drawImage(video, 0, 0, w, h);
+  const data = FACES.cv.toDataURL("image/jpeg", 0.8);
+  const id = "f" + (++FACES.id);
+  const done = arr => {
+    FACES.busy = false;
+    if (arr.length) {
+      const big = arr[0];
+      $("#visor").dataset.look = big.x < -0.35 ? "left" : big.x > 0.35 ? "right" : "";
+      sendUp({t: "faces", faces: arr});
+    }
+  };
+  const t = setTimeout(() => { if (FACES.pending[id]) { delete FACES.pending[id]; done([]); } }, 5000);
+  FACES.pending[id] = arr => { clearTimeout(t); done(arr); };
+  Android.detectFaces(id, data, true);
 }

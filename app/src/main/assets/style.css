@@ -271,3 +271,19 @@ body.eyes-mode .eyes-hint.gone{opacity:0}
 .cal-row button{min-height:44px;border-radius:12px;background:var(--steel);border:1px solid var(--line);font-weight:600;font-size:14px}
 .cal-row button:active{background:var(--rivet)}
 .cal-row output{text-align:center;font:700 18px var(--cond);color:var(--amber)}
+
+/* ---------- explore ---------- */
+.explore{display:flex;align-items:center;gap:14px;margin-top:14px;padding:14px 16px;border-radius:16px;background:var(--plate);border:1px solid var(--line)}
+.explore strong{display:block;font:700 19px var(--cond);color:var(--amber)}
+.explore span{color:var(--text);font-size:14px}
+.explore .note{margin:4px 0 0}
+.switch{flex:none;width:64px;height:36px;border-radius:18px;background:var(--steel);border:1px solid var(--line);position:relative;transition:background .2s}
+.switch span{position:absolute;top:3px;left:3px;width:28px;height:28px;border-radius:50%;background:var(--muted);transition:transform .2s,background .2s}
+.switch[aria-checked=true]{background:var(--amber-deep)}
+.switch[aria-checked=true] span{transform:translateX(28px);background:var(--amber)}
+.person{display:flex;justify-content:space-between;align-items:center;min-height:52px;padding:0 4px 0 14px;margin:6px 0;border-radius:12px;background:var(--plate);border:1px solid var(--line)}
+.person button{min-height:44px;padding:0 14px;border-radius:10px;font-weight:600;color:var(--muted)}
+#forgetAll{margin-top:8px}
+
+.row.hs-high[hidden]{display:none}
+.seg button{font-size:14px}
