@@ -72,6 +72,7 @@ const FOLLOW = {on: false, light: null, seenAt: 0, tok: 0};
 async function follow(mode){
   if (isEyes()) { say(pick("needLegs")); return "nolegs"; }
   if (!S.eyes.linked) { say(pick("needEyes")); return "noeyes"; }
+  if (noLegs()) return followWithEyes(mode);
   if (!S.online) { await refreshState(); if (!S.online) { say(pick("noLink")); return "nolink"; } }
   if (window.braveCheck) await braveCheck(mode);
   const tok = ++S.token;
@@ -100,6 +101,32 @@ async function follow(mode){
     }
   }
   FOLLOW.on = false;
+  linkSend({t: "follow", on: false});
+  if (tok === S.token) { S.custom = null; renderStatus(); }
+  if (mode === "follow" && result === "lost") say(pick("lightLost"));
+  return result;
+}
+
+// No legs: he can't walk to the light, but his eyes follow it, and in Hide and Seek he "spots" you.
+async function followWithEyes(mode){
+  const tok = ++S.token;
+  FOLLOW.on = true; FOLLOW.light = null; FOLLOW.seenAt = Date.now();
+  S.custom = mode === "seek" ? "Looking for your light" : "Watching the light"; renderStatus();
+  linkSend({t: "follow", on: true});
+  const t0 = Date.now(); let result = "stopped", lastDir = null;
+  while (FOLLOW.on && tok === S.token) {
+    const L = FOLLOW.light, fresh = L && L.seen && Date.now() - FOLLOW.seenAt < 700;
+    if (fresh) {
+      const x = L.x * (P.lightInv ? -1 : 1);
+      const dir = x < -0.3 ? "left" : x > 0.3 ? "right" : "";
+      if (dir !== lastDir) { look(dir); lastDir = dir; }
+      if (mode === "seek" && Date.now() - t0 > 1500) { result = "found"; break; }
+    } else if (mode === "follow" && Date.now() - FOLLOW.seenAt > 3000) { result = "lost"; break; }
+    else if (mode === "seek" && Date.now() - t0 > 60000) { result = "giveup"; break; }
+    else if (mode === "seek" && Math.random() < 0.05) { const d = ["left", "right", "up", ""][Math.floor(Math.random() * 4)]; look(d); lastDir = d; }
+    await sleep(200);
+  }
+  FOLLOW.on = false; look("");
   linkSend({t: "follow", on: false});
   if (tok === S.token) { S.custom = null; renderStatus(); }
   if (mode === "follow" && result === "lost") say(pick("lightLost"));
@@ -236,7 +263,7 @@ async function runCopy(g){
 }
 
 async function runSeek(g){
-  say(pick("seekStart")); await speakDone();
+  say(pick(noLegs() ? "seekNoLegs" : "seekStart")); await speakDone();
   if (!alive(g)) return;
   S.hold = {m: "sleep", until: Date.now() + 15000};
   for (let n = 1; n <= 10 && alive(g); n++) { say(pick("count", {n})); await speakDone(); await sleep(350); }
@@ -290,7 +317,7 @@ function playCard(code){
     else if (GAME_NAMES[(p[2] || "").toLowerCase()]) startGame(p[2].toLowerCase());
     return true;
   }
-  if (p[1] === "FOLLOW") { if (!FOLLOW.on) { say(pick("followStart")); follow("follow"); } return true; }
+  if (p[1] === "FOLLOW") { if (!FOLLOW.on) { say(pick(noLegs() ? "followEyes" : "followStart")); follow("follow"); } return true; }
   if (GAME.on) {
     if (GAME.kind === "hunt" && p[1] === "TREASURE") { huntCard(code); return true; }
     if (GAME.want) { GAME.want(code); return true; }
@@ -327,7 +354,7 @@ function playParse(t, has){
 function playExecute(c){
   if (c.cmd === "endgame") { if (GAME.on) endGame(false); else say(pick("noGame")); return true; }
   if (c.cmd === "game") { startGame(c.kind); return true; }
-  if (c.cmd === "follow") { if (!FOLLOW.on) { say(pick("followStart")); follow("follow"); } return true; }
+  if (c.cmd === "follow") { if (!FOLLOW.on) { say(pick(noLegs() ? "followEyes" : "followStart")); follow("follow"); } return true; }
   if (c.cmd === "status") {
     const i = rankIdx(), next = RANKS[i + 1];
     say(pick(ST.happy > 70 ? "statusHigh" : ST.happy < 30 ? "statusLow" : "status",

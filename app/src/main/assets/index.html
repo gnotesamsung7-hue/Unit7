@@ -71,7 +71,7 @@
         <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
         <span id="micLabel">Talk to Unit 7</span>
       </button>
-      <p class="hint" id="micHint">Try “walk forward three steps”, “follow the light”, “play colour quiz”, or “how happy are you?”</p>
+      <p class="hint" id="micHint">Try “walk forward three steps”, “play colour quiz”, “how was your day?”, or “I’m tired”.</p>
 
       <div class="meter">
         <div class="meter-top">
@@ -84,7 +84,7 @@
           <div><span>Bravery</span><div class="bar thin"><div id="braveBar"></div></div></div>
           <div><span>Curiosity</span><div class="bar thin"><div id="curiousBar"></div></div></div>
         </div>
-        <button id="logBtn" class="linkbtn">Story and maintenance log</button>
+        <button id="logBtn" class="linkbtn">Journal, places and story</button>
       </div>
 
       <div class="explore">
@@ -240,6 +240,11 @@
         <button data-chat="normal" role="radio">Normal</button>
         <button data-chat="chatty" role="radio">Chatty</button>
       </div>
+      <label class="toggle"><input type="checkbox" id="pCheckin"><span>Daily check-in: he asks how you're feeling once a day</span></label>
+      <div class="seg" role="radiogroup" aria-label="Check-in time">
+        <button data-ctime="morning" role="radio">Morning check-in</button>
+        <button data-ctime="evening" role="radio">Evening check-in</button>
+      </div>
       <label class="toggle"><input type="checkbox" id="pIdleMoves"><span>Idle moves: bolt checks and stretches in place</span></label>
       <label class="toggle"><input type="checkbox" id="pWander"><span>Let him wander: small turns when he's curious</span></label>
 
@@ -248,6 +253,14 @@
       <button id="forgetAll" class="btn">Forget everyone</button>
       <p class="note small">Faces are stored as numbers on this phone only, and only for people who said yes.</p>
 
+      <h2>Body</h2>
+      <div class="seg" role="radiogroup" aria-label="Body">
+        <button data-body="spider" role="radio">LAFVIN spider</button>
+        <button data-body="none" role="radio">No legs</button>
+      </div>
+      <p class="note small" id="bodyNote"></p>
+
+      <div id="robotSection">
       <h2>Robot</h2>
       <p class="note">Join the robot’s Wi-Fi (“Robot - …”, password 12345678), then come back here.</p>
       <div class="field">
@@ -255,6 +268,7 @@
         <input id="addr" inputmode="url" autocomplete="off" spellcheck="false">
       </div>
       <button id="testBtn" class="btn">Check connection</button>
+      </div>
 
       <h2>Eyes phone</h2>
       <p class="note" id="eyesStatus">No Eyes phone found yet.</p>
@@ -294,8 +308,15 @@
   <div id="logScreen" class="role" hidden>
     <div class="role-in log-in">
       <div class="log-head"><h1>Unit 7’s files</h1><button id="logClose" class="btn">Close</button></div>
+      <h2>Journal</h2>
+      <div id="moodStrip" class="moodstrip" aria-label="Mood over the last 7 days"></div>
+      <div id="journalList"></div>
+      <button id="forgetJournal" class="btn">Clear journal</button>
       <h2>The missing units</h2>
       <div id="storyList"></div>
+      <h2>Places we've been</h2>
+      <div id="placeList"></div>
+      <button id="forgetPlaces" class="btn">Forget all places</button>
       <h2>Maintenance log</h2>
       <div id="logList"></div>
     </div>
@@ -337,5 +358,9 @@
 <script src="persona.js"></script>
 <script src="calib.js"></script>
 <script src="explore.js"></script>
+<script src="nolegs.js"></script>
+<script src="chat.js"></script>
+<script src="places.js"></script>
+<script src="journal.js"></script>
 </body>
 </html>

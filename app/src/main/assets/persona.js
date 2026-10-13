@@ -159,7 +159,7 @@ function renderTraits(){
   if (c) c.style.width = ST.curious + "%";
 }
 // Rank flavours his way of speaking: nervous as a trainee, confident as Chief Engineer.
-const NO_FLAVOUR = /^(count|quiz|copy|hunt|seek|clap|body|meet|greet|explore|people|cal)/;
+const NO_FLAVOUR = /^(count|quiz|copy|hunt|seek|clap|body|meet|greet|explore|people|cal|chat|place|jr)/;
 function flavour(text, key){
   if (NO_FLAVOUR.test(key || "") || text.length < 20 || text.startsWith("[") || Math.random() > 0.25) return text;
   const r = rankIdx();
@@ -168,7 +168,7 @@ function flavour(text, key){
   return text;
 }
 async function braveCheck(mode){
-  if (mode !== "follow") return;
+  if (mode !== "follow" || noLegs()) return;
   if (ST.brave < 30) {
     say(pick("followTimid"));
     if (S.online) { S.pos = null; await req("POST", "/api/v1/action?id=" + ACT.backward); await sleep(300); await waitIdle(6000); }
@@ -310,7 +310,16 @@ function setName(t){
 
 /* ---------- Conversation ---------- */
 function personaParse(t, has, raw){
-  if (personaAsking() && !has("stop","halt","freeze","cancel")) return {cmd: "answer", t};
+  if (personaAsking() && !has("stop","halt","freeze","cancel")) {
+    // A short command ("wave", "dance") is a command, not an answer to his question.
+    if (t.trim().split(" ").length <= 2 && !/\b(my name|call me|i'm|i am)\b/.test(t)) {
+      const kind = ASK.kind; ASK.kind = null;
+      const c = parse(raw);
+      ASK.kind = kind;
+      if (c && c.cmd !== "praise") { ASK.kind = null; return c; }
+    }
+    return {cmd: "answer", t};
+  }
   if (t.includes(" my name is ") || t.includes(" call me ")) return {cmd: "setname", t};
   if (has("joke","jokes","funny") || t.includes(" make me laugh ")) return {cmd: "joke"};
   if (has("story","tale","chapter")) return {cmd: "story"};

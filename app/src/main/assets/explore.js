@@ -128,8 +128,9 @@ async function meet(emb){
       PEOPLE.push({name, embs: [emb], met: Date.now()});
       savePeople(PEOPLE); renderPeople();
       EXP.greeted[name] = Date.now();
+      if (window.placeMet) placeMet(name);
       say(pick("meetRemember", {who: name}));
-    } else say(pick("meetForget"));
+    } else { say(pick("meetForget")); if (window.placeMet) placeMet(name); }
   } else say(pick("meetNoName"));
   if (!EXP.on) return;
   const who = name || "friend";

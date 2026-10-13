@@ -287,3 +287,37 @@ body.eyes-mode .eyes-hint.gone{opacity:0}
 
 .row.hs-high[hidden]{display:none}
 .seg button{font-size:14px}
+
+/* ---------- no-leg mode: acting moves out on screen ---------- */
+.visor svg{transform-origin:50% 60%}
+.visor[data-act=walk] svg{animation:aWalk .45s ease-in-out infinite alternate}
+.visor[data-act=back] svg{animation:aWalk .55s ease-in-out infinite alternate-reverse;scale:.95}
+.visor[data-act=left] svg{animation:aSide .5s ease-out forwards;--dx:-8%}
+.visor[data-act=right] svg{animation:aSide .5s ease-out forwards;--dx:8%}
+.visor[data-act=dance] svg{animation:aDance .32s ease-in-out infinite alternate}
+.visor[data-act=hop] svg{animation:aHop .7s cubic-bezier(.3,.7,.4,1)}
+.visor[data-act=sit] svg{animation:aSit .6s ease-out forwards}
+.visor[data-act=shake] svg{animation:aShake .12s linear infinite}
+.visor[data-act=pushups] svg{animation:aPush .5s ease-in-out infinite alternate}
+.visor[data-act=wave] svg{animation:aWave .5s ease-in-out 3 alternate}
+.visor[data-act=stand] svg{animation:aStand .5s ease-out}
+@keyframes aWalk{from{transform:translateY(-2%) rotate(-1.5deg)}to{transform:translateY(2%) rotate(1.5deg)}}
+@keyframes aSide{to{transform:translateX(var(--dx))}}
+@keyframes aDance{from{transform:rotate(-6deg) translateY(-2%)}to{transform:rotate(6deg) translateY(2%)}}
+@keyframes aHop{0%{transform:translateY(0) scaleY(1)}20%{transform:translateY(4%) scaleY(.9)}50%{transform:translateY(-22%) scaleY(1.05)}80%{transform:translateY(2%) scaleY(.95)}100%{transform:none}}
+@keyframes aSit{to{transform:translateY(8%) scale(.96)}}
+@keyframes aShake{0%{transform:translateX(-1.5%)}50%{transform:translateX(1.5%)}100%{transform:translateX(-1.5%)}}
+@keyframes aPush{from{transform:scaleY(1)}to{transform:scaleY(.86) translateY(5%)}}
+@keyframes aWave{from{transform:rotate(-4deg)}to{transform:rotate(4deg)}}
+@keyframes aStand{from{transform:translateY(6%)}to{transform:none}}
+nav button[hidden]{display:none}
+
+#robotSection[hidden]{display:none}
+
+/* ---------- journal ---------- */
+.moodstrip{display:flex;justify-content:space-between;align-items:flex-end;gap:6px;height:84px;padding:10px 14px;margin:8px 0;border-radius:14px;background:var(--plate);border:1px solid var(--line)}
+.mday{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%}
+.mday span{color:var(--muted);font-size:12px}
+.mbar{width:70%;max-width:26px;border-radius:6px;background:var(--rivet)}
+.mbar.m1{background:#c0563f}.mbar.m2{background:#d58a3a}.mbar.m3{background:#c9b04a}.mbar.m4{background:#8fbf6a}.mbar.m5{background:#5fbf8a}
+#forgetJournal{margin-bottom:6px}

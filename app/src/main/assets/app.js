@@ -52,7 +52,7 @@ function clampA(i,a){
 
 /* ---------- Preferences ---------- */
 const DEFAULTS = {base:"192.168.4.1", talk:true, sfx:true, offline:true, flipStop:true,
-  invF:false, invT:false, walk:"normal", tiltLayout:"side", balance:true, role:null, eyesAddr:"", color:"amber", wake:false, lightInv:false};
+  invF:false, invT:false, walk:"normal", tiltLayout:"side", balance:true, role:null, eyesAddr:"", color:"amber", body:"spider", wake:false, lightInv:false};
 const P = Object.assign({}, DEFAULTS, (() => { try { return JSON.parse(localStorage.getItem("u7.prefs")) || {}; } catch(e){ return {}; } })());
 const savePrefs = () => { try { localStorage.setItem("u7.prefs", JSON.stringify(P)); } catch(e){} };
 if (!P.v2tilt) { P.v2tilt = 1; if (P.walk === "builtin") P.walk = "normal"; P.tiltLayout = "side"; savePrefs(); }
@@ -85,7 +85,10 @@ const U7 = window.U7 = {
 
 /* ---------- Robot link ---------- */
 let lastQuiet = 0;
+// No-leg mode: there is no robot to talk to, so robot requests quietly do nothing.
+const noLegs = () => P.body === "none";
 async function req(method, path, body){
+  if (noLegs()) return {status: 0, json: null};
   const url = "http://" + P.base + path;
   if (window.countSteps && method === "POST" && path.startsWith("/api/v1/action?id=")) countSteps(+path.split("=")[1]);
   // Tell the Eyes phone the servos are about to make noise, so it doesn't mistake them for claps or waves.
@@ -127,7 +130,8 @@ function setOnline(on){
 const robotBusy = () => { const s = S.state; return !!(s && (s.busy || s.requested_action_id)); };
 function renderStatus(){
   let t;
-  if (!S.online) t = "Not connected. Join the robot’s Wi-Fi.";
+  if (noLegs()) t = S.custom || "No-leg mode: chatting, cards and games";
+  else if (!S.online) t = "Not connected. Join the robot’s Wi-Fi.";
   else if (S.custom) t = S.custom;
   else if (robotBusy()) t = ACTION_NAMES[S.state.current_action_id || S.state.requested_action_id] || "Moving";
   else t = "Ready for work orders";
@@ -152,6 +156,7 @@ async function waitIdle(maxMs){
 }
 
 async function runAction(id){
+  if (noLegs()) { actVisual(ACT_LOOK[id] || "walk"); return true; }
   S.token++; S.custom = null; S.pos = null;
   if (S.state) S.state.requested_action_id = id;
   const r = await req("POST", "/api/v1/action?id=" + id);
@@ -366,6 +371,21 @@ function beep(kind){
   o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0 + 0.17);
 }
 
+/* ---------- Acting it out on screen (no-leg mode) ---------- */
+const ACT_LOOK = {1:"stand", 2:"walk", 3:"back", 4:"left", 5:"right", 6:"left", 7:"right", 8:"sit", 9:"wave", 10:"shake",
+  11:"pushups", 12:"sit", 13:"dance", 14:"dance", 15:"dance", 21:"walk", 99:"stand"};
+let actT = null;
+function actVisual(kind, ms){
+  const v = $("#visor");
+  v.dataset.act = ""; void v.offsetWidth;   // restart the animation
+  v.dataset.act = kind;
+  clearTimeout(actT);
+  const dur = ms || (kind === "sit" ? 3000 : kind === "hop" ? 700 : 2400);
+  actT = setTimeout(() => { if (v.dataset.act === kind) v.dataset.act = ""; }, dur);
+  if (kind === "left" || kind === "right") look(kind);
+  if (P.role === "ctl" && S.eyes.linked) linkSend({t: "act", a: kind, ms: dur});
+}
+
 /* ---------- Mouth: follows mood, talking and happiness ---------- */
 const MOUTH = {idle:"smile", happy:"grin", party:"grin", think:"hmm", listen:"o", surprised:"bigo", seen:"bigo",
   worried:"wavy", dizzy:"wavy", sad:"frown", angry:"zig", sleep:"snore", busy:"flat"};
@@ -399,6 +419,9 @@ setInterval(() => {   // idle glances
 /* ---------- Commands ---------- */
 const NUMS = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,a:1,an:1,once:1,twice:2};
 function parse(raw){
+  // Remember the first wording of each new utterance, for light conversation if nothing matches.
+  if (Date.now() - (S.parseAt || 0) > 400) S.firstHeard = String(raw);
+  S.parseAt = Date.now();
   const t = " " + raw.toLowerCase().replace(/unit\s*(7|seven)/g, " ").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ") + " ";
   const has = (...w) => w.some(x => t.includes(" " + x + " "));
   let n = null;
@@ -436,7 +459,10 @@ function parse(raw){
 
 async function execute(c){
   if (window.userActive) userActive();
-  if (!c) { beep("down"); say(pick("unknown")); return; }
+  if (!c) {
+    if (window.chatFallback && S.firstHeard && Date.now() - (S.parseAt || 0) < 3000 && chatFallback(S.firstHeard)) return;
+    beep("down"); say(pick("unknown")); return;
+  }
   const talkOnly = ["intro","chief","thanks","praise","battery"];
   if (c.cmd === "stop") { hush(); emergencyStop(true); say(pick("stop")); return; }
   if (window.personaExecute && personaExecute(c)) return;
@@ -448,7 +474,7 @@ async function execute(c){
     } else say(pick(c.cmd));
     return;
   }
-  if (!S.online) { await refreshState(); if (!S.online) { say(pick("noLink")); return; } }
+  if (!S.online && !noLegs()) { await refreshState(); if (!S.online) { say(pick("noLink")); return; } }
   if (c.cmd === "hop") return hop();
   if (["forward","backward","turnleft","turnright","stepleft","stepright"].includes(c.cmd)) {
     say(pick(c.cmd));
@@ -461,6 +487,7 @@ async function execute(c){
 }
 
 async function walkSteps(id, n, label){
+  if (noLegs()) { actVisual(ACT_LOOK[id] || "walk", Math.min(6000, 1100 * n)); return; }
   const tok = ++S.token; S.custom = label + " (" + n + " step" + (n > 1 ? "s" : "") + ")"; renderStatus();
   await makeRoom();
   for (let k = 1; k <= n; k++) {
@@ -754,6 +781,7 @@ function legTiltTick(){
 /* ---------- Hop ---------- */
 async function hop(){
   if (Date.now() - S.lastHop < 5000) { say(pick("hopCooldown")); return; }
+  if (noLegs()) { S.lastHop = Date.now(); say(pick("pretendHop")); setTimeout(() => actVisual("hop", 700), 600); return; }
   S.lastHop = Date.now();
   if (typeof ST !== "undefined" && ST.brave < 30) { say(pick("hopNervous")); await sleep(1500); }
   if (window.grow) grow("brave", 1);
@@ -775,9 +803,9 @@ async function hop(){
 
 /* ---------- UI wiring ---------- */
 let toastTimer;
-function toast(msg){
+function toast(msg, ms){
   const el = $("#toast"); el.textContent = msg; el.classList.add("show");
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), 3200);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), ms || 3200);
 }
 function showTab(name){
   S.tab = name;
@@ -946,6 +974,7 @@ function linkIn(raw, from){
   else if (m.t === "look") $("#visor").dataset.look = m.d;
   else if (m.t === "hush") hush();
   else if (m.t === "color") { if (!m.temp) { P.color = m.c; savePrefs(); } applyColor(m.c); }
+  else if (m.t === "act") actVisual(m.a, m.ms);
   else if (window.senseLink) senseLink(m);
 }
 function renderEyesLink(){
@@ -1098,7 +1127,7 @@ async function doCard(code){
   S.hold = {m: card.mood, until: Date.now() + card.ms};
   say(pick(typeof card.line === "function" ? card.line() : card.line));
   if (window.grow) grow("curious", 1);
-  if (P.role === "ctl" && S.online && card.move) card.move();
+  if (P.role === "ctl" && (S.online || noLegs()) && card.move) card.move();
 }
 // Eyes phone: watch through the front camera for cards.
 const scan = {last:"", lastAt:0, busy:false, flip:false, on:false};
